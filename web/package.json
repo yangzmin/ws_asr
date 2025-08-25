@@ -1,0 +1,27 @@
+{
+  "name": "video-demo-frontend",
+  "version": "1.0.0",
+  "description": "Video Demo Frontend with Ant Design X Vue",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:prod": "vite build --mode production",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@ant-design/icons-vue": "^7.0.0",
+    "ant-design-vue": "^4.0.0",
+    "axios": "^1.5.0",
+    "markdown-it": "^14.1.0",
+    "marked": "^16.1.2",
+    "pinia": "^2.1.6",
+    "vue": "^3.3.4",
+    "vue-router": "^4.2.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.3.4",
+    "typescript": "^5.2.2",
+    "vite": "^4.4.9",
+    "vue-tsc": "^1.8.8"
+  }
+}
