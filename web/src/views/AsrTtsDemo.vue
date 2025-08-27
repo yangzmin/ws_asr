@@ -46,6 +46,13 @@
             >
               {{ isRecording ? '停止录音' : '开始录音' }}
             </button>
+            <button 
+              @click="abortChat" 
+              :disabled="!wsConnected || (!isRecording && ttsStatus === 'idle')"
+              class="btn-abort"
+            >
+              中止对话
+            </button>
             <div class="recording-status" v-if="isRecording">
               <div class="recording-indicator"></div>
               <span>正在录音...</span>
@@ -91,6 +98,165 @@
             </button>
             <button @click="stopAudio" :disabled="!isAudioPlaying && ttsStatus !== 'paused'">
               停止播放
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 文本聊天区域 -->
+      <div class="text-chat-section">
+        <h3>文本对话</h3>
+        <div class="chat-input-area">
+          <div class="input-group">
+            <input 
+              type="text" 
+              v-model="chatInput" 
+              @keyup.enter="sendChatMessage"
+              :disabled="!wsConnected || ttsStatus === 'loading'"
+              placeholder="输入消息并按回车发送..."
+              class="chat-input"
+            />
+            <button 
+              @click="sendChatMessage" 
+              :disabled="!wsConnected || !chatInput.trim() || ttsStatus === 'loading'"
+              class="btn-send"
+            >
+              发送
+            </button>
+          </div>
+          <div class="chat-options">
+            <label>
+              <input type="checkbox" v-model="enableTextDetect" />
+              启用文本检测模式
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- 图片上传区域 -->
+      <div class="image-upload-section">
+        <h3>图片上传</h3>
+        <div class="upload-area">
+          <input 
+            type="file" 
+            ref="imageInput"
+            @change="handleImageSelect"
+            accept="image/*"
+            style="display: none;"
+          />
+          <div class="upload-controls">
+            <button 
+              @click="selectImage" 
+              :disabled="!wsConnected || ttsStatus === 'loading'"
+              class="btn-select-image"
+            >
+              选择图片
+            </button>
+            <button 
+              @click="sendImageMessage" 
+              :disabled="!wsConnected || !selectedImage || ttsStatus === 'loading'"
+              class="btn-send-image"
+            >
+              发送图片
+            </button>
+          </div>
+          <div v-if="selectedImage" class="image-preview">
+            <img :src="imagePreviewUrl" alt="预览图片" class="preview-img" />
+            <div class="image-info">
+              <p>文件名: {{ selectedImage.name }}</p>
+              <p>大小: {{ formatFileSize(selectedImage.size) }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 视觉功能区域 -->
+      <div class="vision-section">
+        <h3>视觉功能</h3>
+        <div class="vision-controls">
+          <div class="vision-buttons">
+            <button 
+              @click="sendVisionMessage('gen_pic')"
+              :disabled="!wsConnected || ttsStatus === 'loading'"
+              class="btn-vision"
+            >
+              生成图片
+            </button>
+            <button 
+              @click="sendVisionMessage('gen_video')"
+              :disabled="!wsConnected || ttsStatus === 'loading'"
+              class="btn-vision"
+            >
+              生成视频
+            </button>
+            <button 
+              @click="sendVisionMessage('read_img')"
+              :disabled="!wsConnected || ttsStatus === 'loading'"
+              class="btn-vision"
+            >
+              读取图片
+            </button>
+          </div>
+          <div class="vision-input">
+            <input 
+              type="text" 
+              v-model="visionPrompt" 
+              @keyup.enter="sendVisionWithPrompt"
+              :disabled="!wsConnected || ttsStatus === 'loading'"
+              placeholder="输入视觉相关的提示词..."
+              class="vision-prompt-input"
+            />
+            <button 
+              @click="sendVisionWithPrompt" 
+              :disabled="!wsConnected || !visionPrompt.trim() || ttsStatus === 'loading'"
+              class="btn-send-vision"
+            >
+              发送
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- IoT设备控制区域 -->
+      <div class="iot-section">
+        <h3>IoT设备控制</h3>
+        <div class="iot-controls">
+          <div class="iot-input-group">
+            <div class="input-row">
+              <label>设备描述符:</label>
+              <textarea 
+                v-model="iotDescriptors" 
+                :disabled="!wsConnected || ttsStatus === 'loading'"
+                placeholder="输入设备描述符JSON数组，例如: [{'device_id': 'light1', 'type': 'light'}]"
+                class="iot-textarea"
+                rows="3"
+              ></textarea>
+            </div>
+            <div class="input-row">
+              <label>设备状态:</label>
+              <textarea 
+                v-model="iotStates" 
+                :disabled="!wsConnected || ttsStatus === 'loading'"
+                placeholder="输入设备状态JSON数组，例如: [{'device_id': 'light1', 'state': 'on'}]"
+                class="iot-textarea"
+                rows="3"
+              ></textarea>
+            </div>
+          </div>
+          <div class="iot-buttons">
+            <button 
+              @click="sendIotMessage" 
+              :disabled="!wsConnected || (!iotDescriptors.trim() && !iotStates.trim()) || ttsStatus === 'loading'"
+              class="btn-send-iot"
+            >
+              发送IoT消息
+            </button>
+            <button 
+              @click="clearIotInputs" 
+              :disabled="!iotDescriptors.trim() && !iotStates.trim()"
+              class="btn-clear-iot"
+            >
+              清空输入
             </button>
           </div>
         </div>
@@ -143,10 +309,13 @@
 import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
 import { message } from 'ant-design-vue'
 
-// WebSocket 相关
+// WebSocket相关
 const wsRef = ref(null)
 const wsConnected = ref(false)
 const sessionId = ref('')
+const reconnectAttempts = ref(0)
+const maxReconnectAttempts = 5
+const reconnectDelay = ref(3000) // 初始重连延迟3秒
 const deviceId = ref('web-client-' + Date.now())
 const clientId = ref('web-' + Math.random().toString(36).substr(2, 9))
 
@@ -182,6 +351,22 @@ const audioChunksCount = ref(0)
 // LLM 相关
 const llmText = ref('')
 
+// 文本聊天相关
+const chatInput = ref('')
+const enableTextDetect = ref(false)
+
+// 图片上传相关
+const imageInput = ref(null)
+const selectedImage = ref(null)
+const imagePreviewUrl = ref('')
+
+// 视觉功能相关
+const visionPrompt = ref('')
+
+// IoT设备控制相关
+const iotDescriptors = ref('')
+const iotStates = ref('')
+
 // 对话历史
 const messages = ref([])
 const messagesContainer = ref(null)
@@ -193,6 +378,13 @@ const showDebug = ref(false)
  * 连接WebSocket服务器
  */
 const connectWebSocket = () => {
+  // 检查重连次数限制
+  if (reconnectAttempts.value >= maxReconnectAttempts) {
+    console.error('已达到最大重连次数，停止重连')
+    addMessage('error', `连接失败，已尝试 ${maxReconnectAttempts} 次重连`)
+    return
+  }
+  
   // 根据配置文件，WebSocket服务器运行在8000端口
   const wsUrl = `ws://localhost:8000/`
   
@@ -202,6 +394,10 @@ const connectWebSocket = () => {
   ws.onopen = () => {
     console.log('WebSocket连接已建立')
     wsConnected.value = true
+    
+    // 重置重连计数
+    reconnectAttempts.value = 0
+    reconnectDelay.value = 3000 // 重置延迟时间
     
     // 发送hello消息，建立会话
     sendHelloMessage()
@@ -220,18 +416,80 @@ const connectWebSocket = () => {
     }
   }
   
-  ws.onclose = () => {
-    console.log('WebSocket连接已关闭')
+  ws.onclose = (event) => {
+    console.log('WebSocket连接已关闭', event)
     wsConnected.value = false
-    addMessage('system', 'WebSocket连接已关闭')
-    message.error('WebSocket连接已断开')
+    
+    const reason = event.reason || '未知原因'
+    const code = event.code || 0
+    
+    addMessage('system', `WebSocket连接已关闭 (代码: ${code}, 原因: ${reason})`)
+    
+    // 根据关闭代码判断是否需要重连
+     if (code !== 1000 && code !== 1001) { // 非正常关闭
+       console.log('检测到异常关闭，准备重连...')
+       addMessage('warning', '连接异常断开，将尝试重连')
+       
+       // 增加重连计数
+       reconnectAttempts.value++
+       
+       // 检查是否超过最大重连次数
+       if (reconnectAttempts.value >= maxReconnectAttempts) {
+         addMessage('error', `已达到最大重连次数 (${maxReconnectAttempts})，停止重连`)
+         return
+       }
+       
+       // 使用指数退避算法计算延迟时间
+       const delay = Math.min(reconnectDelay.value * Math.pow(2, reconnectAttempts.value - 1), 30000) // 最大30秒
+       
+       // 延迟重连
+       setTimeout(() => {
+         if (!wsConnected.value) {
+           console.log(`尝试重新连接WebSocket... (第${reconnectAttempts.value}次)`)
+           addMessage('system', `正在尝试重新连接... (第${reconnectAttempts.value}次)`)
+           connectWebSocket()
+         }
+       }, delay)
+     } else {
+       addMessage('system', 'WebSocket连接正常关闭')
+       // 正常关闭时重置重连计数
+       reconnectAttempts.value = 0
+     }
   }
   
   ws.onerror = (error) => {
     console.error('WebSocket错误:', error)
-    message.error(`WebSocket连接失败: ${error}`)
     wsConnected.value = false
-    addMessage('error', 'WebSocket连接失败')
+    
+    addMessage('error', 'WebSocket连接发生错误')
+    
+    // 使用UI库显示错误提示
+    if (window.ElMessage) {
+      window.ElMessage.error('WebSocket连接失败，请检查网络连接')
+    } else if (message) {
+      message.error('WebSocket连接失败，请检查网络连接')
+    }
+    
+    // 增加重连计数
+     reconnectAttempts.value++
+     
+     // 检查是否超过最大重连次数
+     if (reconnectAttempts.value >= maxReconnectAttempts) {
+       addMessage('error', `已达到最大重连次数 (${maxReconnectAttempts})，停止重连`)
+       return
+     }
+     
+     // 使用指数退避算法计算延迟时间
+     const delay = Math.min(reconnectDelay.value * Math.pow(2, reconnectAttempts.value - 1), 30000) // 最大30秒
+     
+     // 延迟重连
+     setTimeout(() => {
+       if (!wsConnected.value) {
+         console.log(`WebSocket错误后尝试重连... (第${reconnectAttempts.value}次)`)
+         addMessage('system', `连接错误，正在重试... (第${reconnectAttempts.value}次)`)
+         connectWebSocket()
+       }
+     }, delay)
   }
   
   wsRef.value = ws
@@ -260,6 +518,48 @@ const sendHelloMessage = () => {
 }
 
 /**
+ * 为PCM数据添加WAV头
+ */
+const addWavHeader = (pcmData) => {
+  const sampleRate = 16000 // 16kHz采样率
+  const numChannels = 1 // 单声道
+  const bitsPerSample = 16 // 16位深度
+  const byteRate = sampleRate * numChannels * bitsPerSample / 8
+  const blockAlign = numChannels * bitsPerSample / 8
+  const dataSize = pcmData.length
+  const fileSize = 36 + dataSize
+  
+  const header = new ArrayBuffer(44)
+  const view = new DataView(header)
+  
+  // RIFF header
+  view.setUint32(0, 0x46464952, true) // "RIFF"
+  view.setUint32(4, fileSize, true) // File size
+  view.setUint32(8, 0x45564157, true) // "WAVE"
+  
+  // fmt chunk
+  view.setUint32(12, 0x20746d66, true) // "fmt "
+  view.setUint32(16, 16, true) // Chunk size
+  view.setUint16(20, 1, true) // Audio format (PCM)
+  view.setUint16(22, numChannels, true) // Number of channels
+  view.setUint32(24, sampleRate, true) // Sample rate
+  view.setUint32(28, byteRate, true) // Byte rate
+  view.setUint16(32, blockAlign, true) // Block align
+  view.setUint16(34, bitsPerSample, true) // Bits per sample
+  
+  // data chunk
+  view.setUint32(36, 0x61746164, true) // "data"
+  view.setUint32(40, dataSize, true) // Data size
+  
+  // 合并头部和PCM数据
+  const wavData = new Uint8Array(44 + dataSize)
+  wavData.set(new Uint8Array(header), 0)
+  wavData.set(pcmData, 44)
+  
+  return wavData.buffer
+}
+
+/**
  * 处理音频数据
  */
 const handleAudioData = async (data) => {
@@ -275,6 +575,15 @@ const handleAudioData = async (data) => {
     const dataSize = data.byteLength || data.size || 0
     if (dataSize === 0) {
       console.warn('收到空的音频数据')
+      addMessage('warning', '收到空的音频数据')
+      return
+    }
+    
+    // 检查数据大小是否合理（避免过大的数据）
+    const maxSize = 10 * 1024 * 1024 // 10MB
+    if (dataSize > maxSize) {
+      console.error('音频数据过大:', dataSize)
+      addMessage('error', `音频数据过大: ${(dataSize / 1024 / 1024).toFixed(2)}MB`)
       return
     }
     
@@ -285,7 +594,25 @@ const handleAudioData = async (data) => {
       const uint8Array = new Uint8Array(data)
       console.log('音频数据前16字节:', Array.from(uint8Array.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' '))
       
-      audioBlob = new Blob([data], { type: 'audio/mpeg' }) // 默认尝试MP3格式
+      // 尝试识别音频格式
+      let mimeType = 'audio/wav' // 默认WAV
+      let processedData = data
+      
+      if (uint8Array[0] === 0x4F && uint8Array[1] === 0x67 && uint8Array[2] === 0x67 && uint8Array[3] === 0x53) {
+        mimeType = 'audio/ogg' // OGG格式
+      } else if (uint8Array[0] === 0xFF && (uint8Array[1] & 0xE0) === 0xE0) {
+        mimeType = 'audio/mpeg' // MP3格式
+      } else if (uint8Array[0] === 0x52 && uint8Array[1] === 0x49 && uint8Array[2] === 0x46 && uint8Array[3] === 0x46) {
+        mimeType = 'audio/wav' // WAV格式
+      } else {
+        // 可能是PCM原始数据，需要添加WAV头
+        console.log('检测到PCM原始数据，添加WAV头')
+        processedData = addWavHeader(uint8Array)
+        mimeType = 'audio/wav'
+      }
+      
+      audioBlob = new Blob([processedData], { type: mimeType })
+      console.log('检测到音频格式:', mimeType)
     } else if (data instanceof Blob) {
       audioBlob = data
       
@@ -295,6 +622,14 @@ const handleAudioData = async (data) => {
       console.log('Blob音频数据前16字节:', Array.from(uint8Array.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' '))
     } else {
       console.error('未知的音频数据类型:', typeof data)
+      addMessage('error', `未知的音频数据类型: ${typeof data}`)
+      return
+    }
+    
+    // 验证音频数据的有效性
+    if (audioBlob.size === 0) {
+      console.warn('音频Blob为空')
+      addMessage('warning', '音频数据为空')
       return
     }
     
@@ -304,9 +639,20 @@ const handleAudioData = async (data) => {
     hasAudio.value = true
     
     console.log('音频数据已添加，当前总块数:', audioChunks.value.length)
+    addMessage('audio', `接收音频数据: ${(audioBlob.size / 1024).toFixed(2)}KB`)
     
   } catch (error) {
     console.error('处理音频数据时出错:', error)
+    addMessage('error', `音频处理失败: ${error.message}`)
+    
+    // 尝试恢复
+    if (error.name === 'QuotaExceededError') {
+      addMessage('warning', '音频缓存已满，清理旧数据')
+      // 清理一半的旧音频数据
+      const halfLength = Math.floor(audioChunks.value.length / 2)
+      audioChunks.value.splice(0, halfLength)
+      audioChunksCount.value = audioChunks.value.length
+    }
   }
 }
 
@@ -331,11 +677,19 @@ const handleWebSocketMessage = (data) => {
       case 'llm':
         handleLlmMessage(message)
         break
+      case 'error':
+        handleErrorMessage(message)
+        break
+      case 'status':
+        handleStatusMessage(message)
+        break
       default:
-        console.log('未知消息类型:', message.type)
+        console.log('未知消息类型:', message.type, message)
+        handleUnknownMessage(message)
     }
   } catch (error) {
     console.error('解析WebSocket消息失败:', error)
+    addMessage('error', `消息解析失败: ${error.message}`)
   }
 }
 
@@ -368,6 +722,14 @@ const handleTtsMessage = (message) => {
   const state = message.state
   
   switch (state) {
+    case 'start':
+      ttsStatus.value = 'loading'
+      currentTtsText.value = ''
+      audioChunks.value = []
+      hasAudio.value = false
+      addMessage('tts_start', 'TTS服务启动')
+      break
+      
     case 'sentence_start':
       ttsStatus.value = 'loading'
       currentTtsText.value = message.text || ''
@@ -391,7 +753,12 @@ const handleTtsMessage = (message) => {
     case 'stop':
       ttsStatus.value = 'idle'
       currentTtsText.value = ''
+      addMessage('tts_stop', 'TTS服务停止')
       break
+      
+    default:
+      console.log('未知TTS状态:', state, message)
+      addMessage('tts_unknown', `未知TTS状态: ${state}`)
   }
 }
 
@@ -400,9 +767,94 @@ const handleTtsMessage = (message) => {
  */
 const handleLlmMessage = (message) => {
   const text = message.text || ''
+  const emotion = message.emotion || ''
+  
   llmText.value = text
   addMessage('llm', text)
+  
+  // 处理情绪状态
+  if (emotion) {
+    console.log('收到LLM情绪状态:', emotion)
+    addMessage('emotion', `情绪: ${emotion}`)
+  }
+  
   console.log('收到LLM回复:', text)
+}
+
+/**
+ * 处理错误消息
+ */
+const handleErrorMessage = (message) => {
+  const errorText = message.message || message.text || '未知错误'
+  const errorCode = message.code || ''
+  
+  console.error('收到错误消息:', message)
+  
+  // 显示错误信息
+  addMessage('error', `错误: ${errorText}${errorCode ? ` (${errorCode})` : ''}`)
+  
+  // 使用UI库显示错误提示
+  if (window.ElMessage) {
+    window.ElMessage.error(errorText)
+  } else if (message) {
+    message.error(errorText)
+  }
+  
+  // 重置相关状态
+  if (message.type === 'tts_error') {
+    ttsStatus.value = 'idle'
+    currentTtsText.value = ''
+  }
+}
+
+/**
+ * 处理状态消息
+ */
+const handleStatusMessage = (message) => {
+  const status = message.status || ''
+  const statusText = message.message || message.text || ''
+  
+  console.log('收到状态消息:', message)
+  addMessage('status', `状态: ${status}${statusText ? ` - ${statusText}` : ''}`)
+  
+  // 根据状态类型进行相应处理
+  switch (status) {
+    case 'connecting':
+      addMessage('system', '正在连接服务...')
+      break
+    case 'connected':
+      addMessage('system', '服务连接成功')
+      break
+    case 'disconnected':
+      addMessage('system', '服务连接断开')
+      wsConnected.value = false
+      break
+    case 'processing':
+      addMessage('system', '正在处理请求...')
+      break
+    case 'ready':
+      addMessage('system', '服务就绪')
+      break
+    default:
+      addMessage('status', `状态更新: ${status}`)
+  }
+}
+
+/**
+ * 处理未知消息类型
+ */
+const handleUnknownMessage = (message) => {
+  console.warn('收到未知消息类型:', message)
+  addMessage('unknown', `未知消息: ${JSON.stringify(message)}`)
+  
+  // 尝试从消息中提取有用信息
+  if (message.text) {
+    addMessage('info', message.text)
+  }
+  
+  if (message.error) {
+    addMessage('error', message.error)
+  }
 }
 
 /**
@@ -582,6 +1034,335 @@ const sendListenMessage = (state) => {
   
   wsRef.value.send(JSON.stringify(listenMessage))
   console.log('发送Listen消息:', listenMessage)
+}
+
+/**
+ * 中止当前对话
+ */
+const abortChat = () => {
+  // 停止录音
+  if (isRecording.value) {
+    stopRecording()
+  }
+  
+  // 停止音频播放
+  if (isAudioPlaying.value || ttsStatus.value !== 'idle') {
+    stopAudio()
+  }
+  
+  // 发送abort消息
+  sendAbortMessage()
+  
+  // 重置状态
+  asrText.value = ''
+  llmText.value = ''
+  currentTtsText.value = ''
+  ttsStatus.value = 'idle'
+  
+  addMessage('system', '已中止当前对话')
+}
+
+/**
+ * 发送Abort消息
+ */
+const sendAbortMessage = () => {
+  if (!wsRef.value || wsRef.value.readyState !== WebSocket.OPEN) {
+    return
+  }
+  
+  const abortMessage = {
+    type: 'abort'
+  }
+  
+  wsRef.value.send(JSON.stringify(abortMessage))
+  console.log('发送Abort消息:', abortMessage)
+}
+
+/**
+ * 发送文本聊天消息
+ */
+const sendChatMessage = () => {
+  const text = chatInput.value.trim()
+  if (!text || !wsRef.value || wsRef.value.readyState !== WebSocket.OPEN) {
+    return
+  }
+  
+  // 根据是否启用文本检测模式选择消息类型
+  if (enableTextDetect.value) {
+    // 使用listen消息的detect状态
+    sendTextDetectMessage(text)
+  } else {
+    // 使用chat消息类型
+    sendDirectChatMessage(text)
+  }
+  
+  // 清空输入框
+  chatInput.value = ''
+  
+  // 添加到消息历史
+  addMessage('user', text)
+}
+
+/**
+ * 发送直接聊天消息
+ */
+const sendDirectChatMessage = (text) => {
+  if (!wsRef.value || wsRef.value.readyState !== WebSocket.OPEN) {
+    return
+  }
+  
+  const chatMessage = {
+    type: 'chat',
+    text: text
+  }
+  
+  wsRef.value.send(JSON.stringify(chatMessage))
+  console.log('发送Chat消息:', chatMessage)
+}
+
+/**
+ * 发送文本检测消息
+ */
+const sendTextDetectMessage = (text) => {
+  if (!wsRef.value || wsRef.value.readyState !== WebSocket.OPEN) {
+    return
+  }
+  
+  const detectMessage = {
+    type: 'listen',
+    state: 'detect',
+    text: text
+  }
+  
+  wsRef.value.send(JSON.stringify(detectMessage))
+  console.log('发送Text Detect消息:', detectMessage)
+}
+
+/**
+ * 选择图片
+ */
+const selectImage = () => {
+  if (imageInput.value) {
+    imageInput.value.click()
+  }
+}
+
+/**
+ * 处理图片选择
+ */
+const handleImageSelect = (event) => {
+  const file = event.target.files[0]
+  if (!file) {
+    return
+  }
+  
+  // 检查文件类型
+  if (!file.type.startsWith('image/')) {
+    alert('请选择图片文件')
+    return
+  }
+  
+  // 检查文件大小 (限制为10MB)
+  const maxSize = 10 * 1024 * 1024
+  if (file.size > maxSize) {
+    alert('图片文件大小不能超过10MB')
+    return
+  }
+  
+  selectedImage.value = file
+  
+  // 创建预览URL
+  if (imagePreviewUrl.value) {
+    URL.revokeObjectURL(imagePreviewUrl.value)
+  }
+  imagePreviewUrl.value = URL.createObjectURL(file)
+}
+
+/**
+ * 发送图片消息
+ */
+const sendImageMessage = async () => {
+  if (!selectedImage.value || !wsRef.value || wsRef.value.readyState !== WebSocket.OPEN) {
+    return
+  }
+  
+  try {
+    // 将图片转换为base64
+    const base64Data = await fileToBase64(selectedImage.value)
+    
+    const imageMessage = {
+      type: 'image',
+      image_data: base64Data,
+      filename: selectedImage.value.name,
+      mime_type: selectedImage.value.type
+    }
+    
+    wsRef.value.send(JSON.stringify(imageMessage))
+    console.log('发送Image消息:', { ...imageMessage, image_data: '[base64 data]' })
+    
+    // 添加到消息历史
+    addMessage('user', `[图片] ${selectedImage.value.name}`)
+    
+    // 清除选择的图片
+    clearSelectedImage()
+    
+  } catch (error) {
+    console.error('发送图片失败:', error)
+    alert('发送图片失败，请重试')
+  }
+}
+
+/**
+ * 清除选择的图片
+ */
+const clearSelectedImage = () => {
+  if (imagePreviewUrl.value) {
+    URL.revokeObjectURL(imagePreviewUrl.value)
+  }
+  selectedImage.value = null
+  imagePreviewUrl.value = ''
+  if (imageInput.value) {
+    imageInput.value.value = ''
+  }
+}
+
+/**
+ * 将文件转换为base64
+ */
+const fileToBase64 = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      // 移除data:image/xxx;base64,前缀
+      const base64 = reader.result.split(',')[1]
+      resolve(base64)
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+/**
+ * 格式化文件大小
+ */
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+/**
+ * 发送视觉消息
+ */
+const sendVisionMessage = (cmd) => {
+  if (!wsRef.value || wsRef.value.readyState !== WebSocket.OPEN) {
+    return
+  }
+  
+  const visionMessage = {
+    type: 'vision',
+    cmd: cmd
+  }
+  
+  wsRef.value.send(JSON.stringify(visionMessage))
+  console.log('发送Vision消息:', visionMessage)
+  
+  // 添加到消息历史
+  const cmdNames = {
+    'gen_pic': '生成图片',
+    'gen_video': '生成视频',
+    'read_img': '读取图片'
+  }
+  addMessage('user', `[视觉功能] ${cmdNames[cmd] || cmd}`)
+}
+
+/**
+ * 发送带提示词的视觉消息
+ */
+const sendVisionWithPrompt = () => {
+  const prompt = visionPrompt.value.trim()
+  if (!prompt || !wsRef.value || wsRef.value.readyState !== WebSocket.OPEN) {
+    return
+  }
+  
+  const visionMessage = {
+    type: 'vision',
+    cmd: 'gen_pic', // 默认使用生成图片命令
+    prompt: prompt
+  }
+  
+  wsRef.value.send(JSON.stringify(visionMessage))
+  console.log('发送Vision消息:', visionMessage)
+  
+  // 添加到消息历史
+  addMessage('user', `[视觉功能] ${prompt}`)
+  
+  // 清空输入框
+  visionPrompt.value = ''
+}
+
+/**
+ * 发送IoT消息
+ */
+const sendIotMessage = () => {
+  if (!wsRef.value || wsRef.value.readyState !== WebSocket.OPEN) {
+    return
+  }
+  
+  const iotMessage = {
+    type: 'iot'
+  }
+  
+  // 处理设备描述符
+  if (iotDescriptors.value.trim()) {
+    try {
+      const descriptors = JSON.parse(iotDescriptors.value.trim())
+      iotMessage.descriptors = descriptors
+    } catch (error) {
+      alert('设备描述符JSON格式错误，请检查输入')
+      return
+    }
+  }
+  
+  // 处理设备状态
+  if (iotStates.value.trim()) {
+    try {
+      const states = JSON.parse(iotStates.value.trim())
+      iotMessage.states = states
+    } catch (error) {
+      alert('设备状态JSON格式错误，请检查输入')
+      return
+    }
+  }
+  
+  // 检查是否至少有一个字段
+  if (!iotMessage.descriptors && !iotMessage.states) {
+    alert('请至少输入设备描述符或设备状态')
+    return
+  }
+  
+  wsRef.value.send(JSON.stringify(iotMessage))
+  console.log('发送IoT消息:', iotMessage)
+  
+  // 添加到消息历史
+  const messageText = []
+  if (iotMessage.descriptors) {
+    messageText.push(`描述符: ${JSON.stringify(iotMessage.descriptors)}`)
+  }
+  if (iotMessage.states) {
+    messageText.push(`状态: ${JSON.stringify(iotMessage.states)}`)
+  }
+  addMessage('user', `[IoT设备] ${messageText.join(', ')}`)
+}
+
+/**
+ * 清空IoT输入
+ */
+const clearIotInputs = () => {
+  iotDescriptors.value = ''
+  iotStates.value = ''
 }
 
 /**
@@ -966,6 +1747,11 @@ onUnmounted(() => {
   
   if (currentAudio.value) {
     currentAudio.value.pause()
+  }
+  
+  // 清理图片预览URL
+  if (imagePreviewUrl.value) {
+    URL.revokeObjectURL(imagePreviewUrl.value)
   }
 })
 </script>
@@ -1360,6 +2146,387 @@ onUnmounted(() => {
 .debug-toggle:hover,
 .clear-history:hover {
   background-color: #e9ecef;
+}
+
+/* 文本聊天区域样式 */
+.text-chat-section {
+  margin: 20px 0;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+}
+
+.text-chat-section h3 {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-size: 16px;
+}
+
+.chat-input-area {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.input-group {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.chat-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  outline: none;
+}
+
+.chat-input:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.chat-input:disabled {
+  background-color: #e9ecef;
+  cursor: not-allowed;
+}
+
+.btn-send {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.btn-send:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.btn-send:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+.btn-abort {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-left: 10px;
+}
+
+.btn-abort:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
+.btn-abort:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+.chat-options {
+  display: flex;
+  align-items: center;
+}
+
+.chat-options label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+  color: #666;
+  cursor: pointer;
+}
+
+.chat-options input[type="checkbox"] {
+  margin: 0;
+}
+
+/* 图片上传区域样式 */
+.image-upload-section {
+  margin: 20px 0;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+}
+
+.image-upload-section h3 {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-size: 16px;
+}
+
+.upload-area {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.upload-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.btn-select-image,
+.btn-send-image {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.btn-select-image:hover:not(:disabled),
+.btn-send-image:hover:not(:disabled) {
+  background-color: #218838;
+}
+
+.btn-select-image:disabled,
+.btn-send-image:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+.btn-send-image {
+  background-color: #007bff;
+}
+
+.btn-send-image:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.image-preview {
+  display: flex;
+  gap: 15px;
+  align-items: flex-start;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: white;
+}
+
+.preview-img {
+  max-width: 200px;
+  max-height: 200px;
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.image-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.image-info p {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+}
+
+/* 视觉功能区域样式 */
+.vision-section {
+  margin: 20px 0;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+}
+
+.vision-section h3 {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-size: 16px;
+}
+
+.vision-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.vision-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-vision {
+  background-color: #6f42c1;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.btn-vision:hover:not(:disabled) {
+  background-color: #5a32a3;
+}
+
+.btn-vision:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+.vision-input {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.vision-prompt-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  outline: none;
+}
+
+.vision-prompt-input:focus {
+  border-color: #6f42c1;
+  box-shadow: 0 0 0 2px rgba(111, 66, 193, 0.25);
+}
+
+.vision-prompt-input:disabled {
+  background-color: #e9ecef;
+  cursor: not-allowed;
+}
+
+.btn-send-vision {
+  background-color: #6f42c1;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.btn-send-vision:hover:not(:disabled) {
+  background-color: #5a32a3;
+}
+
+.btn-send-vision:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+/* IoT设备控制区域样式 */
+.iot-section {
+  margin: 20px 0;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+}
+
+.iot-section h3 {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-size: 16px;
+}
+
+.iot-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.iot-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.input-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.input-row label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.iot-textarea {
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: 'Courier New', monospace;
+  resize: vertical;
+  outline: none;
+}
+
+.iot-textarea:focus {
+  border-color: #fd7e14;
+  box-shadow: 0 0 0 2px rgba(253, 126, 20, 0.25);
+}
+
+.iot-textarea:disabled {
+  background-color: #e9ecef;
+  cursor: not-allowed;
+}
+
+.iot-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-send-iot,
+.btn-clear-iot {
+  background-color: #fd7e14;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.btn-send-iot:hover:not(:disabled),
+.btn-clear-iot:hover:not(:disabled) {
+  background-color: #e8690b;
+}
+
+.btn-send-iot:disabled,
+.btn-clear-iot:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+.btn-clear-iot {
+  background-color: #6c757d;
+}
+
+.btn-clear-iot:hover:not(:disabled) {
+  background-color: #5a6268;
 }
 
 @media (max-width: 768px) {
