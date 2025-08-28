@@ -46,6 +46,25 @@
             >
               {{ isRecording ? '停止录音' : '开始录音' }}
             </button>
+            
+            <!-- ASR监听控制按钮 -->
+            <div class="listen-controls" v-if="isRecording">
+              <button 
+                @click="startListening" 
+                :disabled="!wsConnected || !isRecording || isListening"
+                class="btn-listen"
+              >
+                开始监听
+              </button>
+              <button 
+                @click="stopListening" 
+                :disabled="!wsConnected || !isRecording || !isListening"
+                class="btn-stop-listen"
+              >
+                终止监听
+              </button>
+            </div>
+            
             <button 
               @click="abortChat" 
               :disabled="!wsConnected || (!isRecording && ttsStatus === 'idle')"
@@ -56,6 +75,7 @@
             <div class="recording-status" v-if="isRecording">
               <div class="recording-indicator"></div>
               <span>正在录音...</span>
+              <span v-if="isListening" class="listening-status">（监听中）</span>
             </div>
           </div>
           
@@ -86,19 +106,42 @@
           </div>
           
           <!-- 音频播放控制 -->
-          <div class="audio-player" v-if="hasAudio">
-            <button @click="playAudio" :disabled="!hasAudio || isAudioPlaying">
-              {{ isAudioPlaying ? '播放中...' : '播放音频' }}
-            </button>
-            <button @click="pauseAudio" :disabled="!isAudioPlaying || ttsStatus === 'paused'">
-              暂停播放
-            </button>
-            <button @click="resumeAudio" :disabled="ttsStatus !== 'paused'">
-              恢复播放
-            </button>
-            <button @click="stopAudio" :disabled="!isAudioPlaying && ttsStatus !== 'paused'">
-              停止播放
-            </button>
+          <div class="audio-player" v-if="hasAudio || isAudioPlaying || ttsStatus === 'paused'">
+            <div class="audio-controls">
+              <button @click="toggleAudio" class="play-toggle-btn">
+                <span v-if="!currentAudio">▶️ 播放</span>
+                <span v-else-if="isAudioPlaying">⏸️ 暂停</span>
+                <span v-else>▶️ 继续</span>
+              </button>
+              <button @click="stopAudio" :disabled="!currentAudio" class="stop-btn">
+                ⏹️ 停止
+              </button>
+            </div>
+            
+            <!-- 音量控制 -->
+            <div class="volume-control">
+              <label>音量:</label>
+              <input 
+                type="range" 
+                min="0" 
+                max="1" 
+                step="0.1" 
+                :value="currentAudio ? currentAudio.volume : 0.8"
+                @input="setAudioVolume($event.target.value)"
+                class="volume-slider"
+              />
+              <span class="volume-value">{{ Math.round((currentAudio ? currentAudio.volume : 0.8) * 100) }}%</span>
+            </div>
+            
+            <!-- 播放状态显示 -->
+            <div class="audio-status">
+              <span class="status-text">
+                状态: {{ ttsStatus === 'playing' ? '播放中' : ttsStatus === 'paused' ? '已暂停' : ttsStatus === 'loading' ? '加载中' : '就绪' }}
+              </span>
+              <span v-if="audioChunks.length > 0" class="chunks-info">
+                音频块: {{ audioChunks.length }}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -338,6 +381,7 @@ const frameDuration = ref(60)
 
 // ASR 相关
 const asrText = ref('')
+const isListening = ref(false) // ASR监听状态
 
 // TTS 相关
 const ttsStatus = ref('idle') // idle, loading, playing, error, paused
@@ -521,7 +565,7 @@ const sendHelloMessage = () => {
  * 为PCM数据添加WAV头
  */
 const addWavHeader = (pcmData) => {
-  const sampleRate = 16000 // 16kHz采样率
+  const sampleRate = 24000 // 24kHz采样率（与后端AudioToPCMData匹配）
   const numChannels = 1 // 单声道
   const bitsPerSample = 16 // 16位深度
   const byteRate = sampleRate * numChannels * bitsPerSample / 8
@@ -560,6 +604,136 @@ const addWavHeader = (pcmData) => {
 }
 
 /**
+ * 将原始Opus数据包装成简单的OGG容器
+ * 注意：这是一个简化的实现，主要用于处理后端发送的Opus数据包
+ */
+const wrapOpusInOgg = (opusData) => {
+  console.log('尝试将Opus数据包装成OGG容器，数据大小:', opusData.byteLength)
+  
+  // 创建OpusHead页面（标识头）
+  const createOpusHead = () => {
+    const headData = new Uint8Array(19)
+    // OpusHead标识
+    const opusHead = 'OpusHead'
+    for (let i = 0; i < opusHead.length; i++) {
+      headData[i] = opusHead.charCodeAt(i)
+    }
+    // 版本
+    headData[8] = 1
+    // 通道数
+    headData[9] = 1
+    // 预跳过样本数（16位小端序）
+    headData[10] = 0
+    headData[11] = 0
+    // 原始输入采样率（32位小端序，24000Hz）
+    headData[12] = 0xC0
+    headData[13] = 0x5D
+    headData[14] = 0x00
+    headData[15] = 0x00
+    // 输出增益（16位小端序）
+    headData[16] = 0
+    headData[17] = 0
+    // 通道映射族
+    headData[18] = 0
+    
+    return headData
+  }
+  
+  // 创建OGG页面
+  const createOggPage = (data, isFirst = false, isLast = false, pageSeq = 0) => {
+    const pageSize = 27 + 1 + data.length
+    const buffer = new ArrayBuffer(pageSize)
+    const view = new DataView(buffer)
+    const uint8View = new Uint8Array(buffer)
+    
+    // OGG页面标识符 "OggS"
+    uint8View[0] = 0x4F
+    uint8View[1] = 0x67
+    uint8View[2] = 0x67
+    uint8View[3] = 0x53
+    
+    // 版本
+    uint8View[4] = 0x00
+    
+    // 头类型标志
+    let headerType = 0
+    if (isFirst) headerType |= 0x02
+    if (isLast) headerType |= 0x04
+    uint8View[5] = headerType
+    
+    // 颗粒位置（64位，简化为0）
+    for (let i = 6; i < 14; i++) {
+      uint8View[i] = 0
+    }
+    
+    // 流序列号（32位，简化为0）
+    view.setUint32(14, 0, true)
+    
+    // 页面序列号
+    view.setUint32(18, pageSeq, true)
+    
+    // CRC校验和（简化为0）
+    view.setUint32(22, 0, true)
+    
+    // 页面段数
+    uint8View[26] = 1
+    
+    // 段表
+    uint8View[27] = Math.min(data.length, 255)
+    
+    // 数据
+    uint8View.set(data, 28)
+    
+    return buffer
+  }
+  
+  try {
+    // 创建OpusHead页面
+    const opusHead = createOpusHead()
+    const headPage = createOggPage(opusHead, true, false, 0)
+    
+    // 将Opus数据分割成合适的块
+    const opusDataArray = new Uint8Array(opusData)
+    const chunks = []
+    const chunkSize = 1024 // 每个OGG页面最大1KB
+    
+    for (let i = 0; i < opusDataArray.length; i += chunkSize) {
+      const chunk = opusDataArray.slice(i, i + chunkSize)
+      chunks.push(chunk)
+    }
+    
+    // 创建数据页面
+    const dataPages = chunks.map((chunk, index) => {
+      const isLast = index === chunks.length - 1
+      return createOggPage(chunk, false, isLast, index + 1)
+    })
+    
+    // 合并所有页面
+    const totalSize = headPage.byteLength + dataPages.reduce((sum, page) => sum + page.byteLength, 0)
+    const result = new ArrayBuffer(totalSize)
+    const resultView = new Uint8Array(result)
+    
+    let offset = 0
+    // 添加头页面
+    resultView.set(new Uint8Array(headPage), offset)
+    offset += headPage.byteLength
+    
+    // 添加数据页面
+    dataPages.forEach(page => {
+      resultView.set(new Uint8Array(page), offset)
+      offset += page.byteLength
+    })
+    
+    console.log('OGG容器创建完成，总大小:', totalSize, '字节')
+    return result
+    
+  } catch (error) {
+    console.error('创建OGG容器失败:', error)
+    return opusData // 如果失败，返回原始数据
+  }
+}
+
+/**
  * 处理音频数据
  */
 const handleAudioData = async (data) => {
@@ -570,6 +744,9 @@ const handleAudioData = async (data) => {
       isArrayBuffer: data instanceof ArrayBuffer,
       isBlob: data instanceof Blob
     })
+    
+    // 添加详细的调试信息
+    addMessage('debug', `收到音频数据: ${data.constructor.name}, 大小: ${(data.byteLength || data.size || 0)} 字节`)
     
     // 检查数据是否有效
     const dataSize = data.byteLength || data.size || 0
@@ -600,19 +777,28 @@ const handleAudioData = async (data) => {
       
       if (uint8Array[0] === 0x4F && uint8Array[1] === 0x67 && uint8Array[2] === 0x67 && uint8Array[3] === 0x53) {
         mimeType = 'audio/ogg' // OGG格式
+        console.log('检测到OGG格式音频')
+        addMessage('debug', '检测到OGG格式音频')
       } else if (uint8Array[0] === 0xFF && (uint8Array[1] & 0xE0) === 0xE0) {
         mimeType = 'audio/mpeg' // MP3格式
+        console.log('检测到MP3格式音频')
+        addMessage('debug', '检测到MP3格式音频')
       } else if (uint8Array[0] === 0x52 && uint8Array[1] === 0x49 && uint8Array[2] === 0x46 && uint8Array[3] === 0x46) {
         mimeType = 'audio/wav' // WAV格式
+        console.log('检测到WAV格式音频')
+        addMessage('debug', '检测到WAV格式音频')
       } else {
-        // 可能是PCM原始数据，需要添加WAV头
-        console.log('检测到PCM原始数据，添加WAV头')
+        // 根据后端日志确认，服务端发送的是PCM格式数据
+        // 直接作为PCM数据处理，添加WAV头
+        console.log('检测到PCM原始数据（后端确认格式），添加WAV头')
+        addMessage('debug', '检测到PCM原始数据（后端确认格式），正在添加WAV头')
         processedData = addWavHeader(uint8Array)
         mimeType = 'audio/wav'
       }
       
       audioBlob = new Blob([processedData], { type: mimeType })
       console.log('检测到音频格式:', mimeType)
+      addMessage('debug', `创建音频Blob: ${mimeType}, 大小: ${audioBlob.size} 字节`)
     } else if (data instanceof Blob) {
       audioBlob = data
       
@@ -720,40 +906,61 @@ const handleSttMessage = (message) => {
  */
 const handleTtsMessage = (message) => {
   const state = message.state
+  const text = message.text || ''
+  const textIndex = message.text_index || 0
+  
+  console.log('收到TTS消息:', { state, text, textIndex })
   
   switch (state) {
     case 'start':
+      // TTS服务整体启动
       ttsStatus.value = 'loading'
       currentTtsText.value = ''
       audioChunks.value = []
       hasAudio.value = false
+      audioChunksCount.value = 0
       addMessage('tts_start', 'TTS服务启动')
+      console.log('TTS服务启动')
       break
       
     case 'sentence_start':
+      // 单句合成开始
       ttsStatus.value = 'loading'
-      currentTtsText.value = message.text || ''
-      audioChunks.value = []
-      hasAudio.value = false
-      addMessage('tts_start', `开始合成: ${message.text}`)
+      currentTtsText.value = text
+      // 不清空audioChunks，因为可能有多句话需要连续播放
+      addMessage('tts_sentence_start', `开始合成第${textIndex}句: ${text}`)
+      console.log(`开始合成第${textIndex}句:`, text)
       break
       
     case 'sentence_end':
-      ttsStatus.value = 'idle'
-      addMessage('tts_end', `合成完成: ${message.text}`)
+      // 单句合成完成
+      addMessage('tts_sentence_end', `第${textIndex}句合成完成: ${text}`)
+      console.log(`第${textIndex}句合成完成:`, text)
       
-      // 如果有音频数据，自动播放
+      // 如果有音频数据，立即播放当前句子
       if (audioChunks.value.length > 0) {
+        console.log(`准备播放第${textIndex}句音频，当前音频块数:`, audioChunks.value.length)
+        // 延迟一点时间确保音频数据完整接收
         setTimeout(() => {
-          createAndPlayAudio()
-        }, 100)
+          playCurrentSentence()
+        }, 50)
+      } else {
+        console.warn(`第${textIndex}句没有音频数据`)
       }
       break
       
     case 'stop':
+      // TTS服务整体停止
       ttsStatus.value = 'idle'
       currentTtsText.value = ''
       addMessage('tts_stop', 'TTS服务停止')
+      console.log('TTS服务停止')
+      
+      // 停止当前播放的音频
+      if (currentAudio.value && !currentAudio.value.paused) {
+        currentAudio.value.pause()
+        isAudioPlaying.value = false
+      }
       break
       
     default:
@@ -768,6 +975,13 @@ const handleTtsMessage = (message) => {
 const handleLlmMessage = (message) => {
   const text = message.text || ''
   const emotion = message.emotion || ''
+  
+  // 检查是否为thinking表情消息
+  if (text === '🤔' || emotion === 'thinking' || (text.includes('🤔') && text.length <= 5)) {
+    console.log('收到thinking表情消息，不作为音频数据处理')
+    addMessage('thinking', '正在思考...')
+    return
+  }
   
   llmText.value = text
   addMessage('llm', text)
@@ -964,6 +1178,11 @@ const stopRecording = () => {
   
   isRecording.value = false
   
+  // 停止ASR监听
+  if (isListening.value) {
+    isListening.value = false
+  }
+  
   // 发送listen stop消息
   sendListenMessage('stop')
   
@@ -1034,6 +1253,32 @@ const sendListenMessage = (state) => {
   
   wsRef.value.send(JSON.stringify(listenMessage))
   console.log('发送Listen消息:', listenMessage)
+}
+
+/**
+ * 开始ASR监听
+ */
+const startListening = () => {
+  if (!wsRef.value || wsRef.value.readyState !== WebSocket.OPEN || !isRecording.value) {
+    return
+  }
+  
+  isListening.value = true
+  sendListenMessage('listen')
+  addMessage('system', '开始ASR监听')
+}
+
+/**
+ * 停止ASR监听
+ */
+const stopListening = () => {
+  if (!wsRef.value || wsRef.value.readyState !== WebSocket.OPEN) {
+    return
+  }
+  
+  isListening.value = false
+  sendListenMessage('stop')
+  addMessage('system', '停止ASR监听')
 }
 
 /**
@@ -1366,6 +1611,32 @@ const clearIotInputs = () => {
 }
 
 /**
+ * 播放当前句子的音频
+ */
+const playCurrentSentence = async () => {
+  try {
+    if (audioChunks.value.length === 0) {
+      console.warn('没有音频数据可播放')
+      return
+    }
+    
+    console.log('播放当前句子，音频块数量:', audioChunks.value.length)
+    
+    // 创建当前句子的音频
+    await createAndPlayAudio()
+    
+    // 播放完成后清空当前句子的音频数据，为下一句做准备
+    audioChunks.value = []
+    audioChunksCount.value = 0
+    hasAudio.value = false
+    
+  } catch (error) {
+    console.error('播放当前句子失败:', error)
+    addMessage('error', `播放失败: ${error.message}`)
+  }
+}
+
+/**
  * 创建并播放音频
  */
 const createAndPlayAudio = async () => {
@@ -1415,8 +1686,8 @@ const createAndPlayAudio = async () => {
     const detectAudioFormat = (audioData) => {
       if (!audioData || audioData.length === 0) return null
       
-      const firstBytes = new Uint8Array(audioData.slice(0, 12))
-      console.log('音频数据前12字节:', Array.from(firstBytes).map(b => b.toString(16).padStart(2, '0')).join(' '))
+      const firstBytes = new Uint8Array(audioData.slice(0, 16))
+      console.log('音频数据前16字节:', Array.from(firstBytes).map(b => b.toString(16).padStart(2, '0')).join(' '))
       
       // WAV格式检测 (RIFF...WAVE)
       if (firstBytes[0] === 0x52 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46 && firstBytes[3] === 0x46 &&
@@ -1430,14 +1701,41 @@ const createAndPlayAudio = async () => {
         return { type: 'audio/mpeg', name: 'MP3 (检测)' }
       }
       
-      // OGG格式检测
+      // OGG格式检测 (包含Opus)
       if (firstBytes[0] === 0x4F && firstBytes[1] === 0x67 && firstBytes[2] === 0x67 && firstBytes[3] === 0x53) {
+        // 检查是否是Opus编码的OGG
+        if (firstBytes.length >= 16) {
+          const opusSignature = 'OpusHead'
+          let isOpus = true
+          for (let i = 0; i < opusSignature.length && i + 8 < firstBytes.length; i++) {
+            if (firstBytes[i + 8] !== opusSignature.charCodeAt(i)) {
+              isOpus = false
+              break
+            }
+          }
+          if (isOpus) {
+            return { type: 'audio/ogg; codecs=opus', name: 'OGG-Opus (检测)' }
+          }
+        }
         return { type: 'audio/ogg', name: 'OGG (检测)' }
       }
       
       // WebM格式检测
       if (firstBytes[0] === 0x1A && firstBytes[1] === 0x45 && firstBytes[2] === 0xDF && firstBytes[3] === 0xA3) {
         return { type: 'audio/webm', name: 'WebM (检测)' }
+      }
+      
+      // 原始Opus数据检测（没有容器格式）
+      // Opus数据包通常以特定的模式开始，但这很难准确检测
+      // 如果前面的格式都不匹配，且数据看起来像是编码的音频数据，尝试作为Opus处理
+      if (firstBytes.length >= 4) {
+        // 检查是否可能是原始Opus数据
+        const hasNonZero = firstBytes.some(byte => byte !== 0)
+        const hasVariation = new Set(firstBytes.slice(0, 8)).size > 2
+        if (hasNonZero && hasVariation) {
+          console.log('可能是原始Opus数据，尝试OGG容器格式')
+          return { type: 'audio/ogg; codecs=opus', name: 'Raw-Opus (推测)' }
+        }
       }
       
       return null
@@ -1619,7 +1917,12 @@ const createAndPlayAudio = async () => {
  * 播放音频
  */
 const playAudio = () => {
-  createAndPlayAudio()
+  if (audioChunks.value.length > 0) {
+    createAndPlayAudio()
+  } else {
+    console.warn('没有音频数据可播放')
+    addMessage('warning', '没有音频数据可播放')
+  }
 }
 
 /**
@@ -1633,6 +1936,12 @@ const stopAudio = () => {
     ttsStatus.value = 'idle'
     console.log('音频播放已停止')
     addMessage('system', '音频播放已停止')
+    
+    // 清理音频资源
+    if (currentAudio.value.src) {
+      URL.revokeObjectURL(currentAudio.value.src)
+    }
+    currentAudio.value = null
   }
 }
 
@@ -1654,12 +1963,54 @@ const pauseAudio = () => {
  */
 const resumeAudio = () => {
   if (currentAudio.value && currentAudio.value.paused) {
-    currentAudio.value.play()
-    isAudioPlaying.value = true
-    ttsStatus.value = 'playing'
-    console.log('音频播放已恢复')
-    addMessage('system', '音频播放已恢复')
+    try {
+      currentAudio.value.play()
+      isAudioPlaying.value = true
+      ttsStatus.value = 'playing'
+      console.log('音频播放已恢复')
+      addMessage('system', '音频播放已恢复')
+    } catch (error) {
+      console.error('恢复播放失败:', error)
+      addMessage('error', `恢复播放失败: ${error.message}`)
+    }
   }
+}
+
+/**
+ * 切换音频播放状态
+ */
+const toggleAudio = () => {
+  if (!currentAudio.value) {
+    playAudio()
+  } else if (currentAudio.value.paused) {
+    resumeAudio()
+  } else {
+    pauseAudio()
+  }
+}
+
+/**
+ * 设置音频音量
+ */
+const setAudioVolume = (volume) => {
+  if (currentAudio.value) {
+    currentAudio.value.volume = Math.max(0, Math.min(1, volume))
+    console.log('音频音量设置为:', currentAudio.value.volume)
+  }
+}
+
+/**
+ * 获取音频播放进度
+ */
+const getAudioProgress = () => {
+  if (currentAudio.value) {
+    return {
+      currentTime: currentAudio.value.currentTime,
+      duration: currentAudio.value.duration,
+      progress: currentAudio.value.duration > 0 ? currentAudio.value.currentTime / currentAudio.value.duration : 0
+    }
+  }
+  return { currentTime: 0, duration: 0, progress: 0 }
 }
 
 /**
@@ -1716,6 +2067,7 @@ const getMessageTypeText = (type) => {
     case 'system': return '系统'
     case 'asr': return 'ASR识别'
     case 'llm': return 'LLM回复'
+    case 'thinking': return '思考中'
     case 'tts_start': return 'TTS开始'
     case 'tts_end': return 'TTS完成'
     case 'error': return '错误'
@@ -1880,10 +2232,19 @@ onUnmounted(() => {
   align-items: center;
   gap: 15px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.listen-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 
 .btn-record,
-.btn-stop {
+.btn-stop,
+.btn-listen,
+.btn-stop-listen {
   padding: 12px 24px;
   border: none;
   border-radius: 8px;
@@ -1891,6 +2252,37 @@ onUnmounted(() => {
   font-weight: 500;
   cursor: pointer;
   transition: all 0.3s ease;
+}
+
+.btn-listen,
+.btn-stop-listen {
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+.btn-listen {
+  background-color: #007bff;
+  color: white;
+}
+
+.btn-listen:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.btn-stop-listen {
+  background-color: #ffc107;
+  color: #212529;
+}
+
+.btn-stop-listen:hover:not(:disabled) {
+  background-color: #e0a800;
+}
+
+.btn-listen:disabled,
+.btn-stop-listen:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .btn-record {
@@ -1923,6 +2315,12 @@ onUnmounted(() => {
   gap: 8px;
   color: #dc3545;
   font-weight: 500;
+}
+
+.listening-status {
+  color: #007bff;
+  font-weight: 600;
+  margin-left: 5px;
 }
 
 .recording-indicator {
@@ -2014,27 +2412,125 @@ onUnmounted(() => {
 
 .audio-player {
   display: flex;
+  flex-direction: column;
+  gap: 15px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+}
+
+.audio-controls {
+  display: flex;
   gap: 10px;
+  align-items: center;
 }
 
 .audio-player button {
-  padding: 10px 20px;
+  padding: 8px 16px;
   border: 1px solid #007bff;
   background-color: #007bff;
   color: white;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.3s ease;
+  font-size: 14px;
+}
+
+.play-toggle-btn {
+  background-color: #28a745 !important;
+  border-color: #28a745 !important;
+}
+
+.play-toggle-btn:hover:not(:disabled) {
+  background-color: #218838 !important;
+}
+
+.stop-btn {
+  background-color: #dc3545 !important;
+  border-color: #dc3545 !important;
+}
+
+.stop-btn:hover:not(:disabled) {
+  background-color: #c82333 !important;
 }
 
 .audio-player button:hover:not(:disabled) {
   background-color: #0056b3;
+  transform: translateY(-1px);
 }
 
 .audio-player button:disabled {
   background-color: #6c757d;
   border-color: #6c757d;
   cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.volume-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.volume-control label {
+  font-size: 14px;
+  color: #495057;
+  min-width: 40px;
+}
+
+.volume-slider {
+  flex: 1;
+  max-width: 150px;
+  height: 6px;
+  background: #dee2e6;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #007bff;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #007bff;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+.volume-value {
+  font-size: 12px;
+  color: #6c757d;
+  min-width: 35px;
+  text-align: right;
+}
+
+.audio-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #6c757d;
+}
+
+.status-text {
+  font-weight: 500;
+}
+
+.chunks-info {
+  background-color: #e9ecef;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
 }
 
 .conversation-history {

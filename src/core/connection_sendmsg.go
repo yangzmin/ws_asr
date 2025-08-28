@@ -112,6 +112,8 @@ func (h *ConnectionHandler) sendAudioMessage(filepath string, text string, textI
 	if len(filepath) == 0 {
 		return
 	}
+	fmt.Println("服务端音频格式:", h.serverAudioFormat)
+
 	// 检查轮次
 	if round != h.talkRound {
 		h.LogInfo(fmt.Sprintf("sendAudioMessage: 跳过过期轮次的音频: 任务轮次=%d, 当前轮次=%d, 文本=%s",

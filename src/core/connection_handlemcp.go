@@ -20,15 +20,16 @@ func (h *ConnectionHandler) initMCPResultHandlers() {
 	}
 }
 
-func (h *ConnectionHandler) handleMCPResultCall(result types.ActionResponse) {
+func (h *ConnectionHandler) handleMCPResultCall(result types.ActionResponse) string {
+	errResult := "调用工具失败"
 	// 先取result
 	if result.Action != types.ActionTypeCallHandler {
 		h.logger.Error("handleMCPResultCall: result.Action is not ActionTypeCallHandler, but %d", result.Action)
-		return
+		return errResult
 	}
 	if result.Result == nil {
 		h.logger.Error("handleMCPResultCall: result.Result is nil")
-		return
+		return errResult
 	}
 
 	// 取出result.Result结构体，包括函数名和参数
@@ -36,12 +37,14 @@ func (h *ConnectionHandler) handleMCPResultCall(result types.ActionResponse) {
 		if handler, exists := h.mcpResultHandlers[Caller.FuncName]; exists {
 			// 调用对应的处理函数
 			handler(Caller.Args)
+			return "调用工具成功: " + Caller.FuncName
 		} else {
 			h.logger.Error("handleMCPResultCall: no handler found for function %s", Caller.FuncName)
 		}
 	} else {
 		h.logger.Error("handleMCPResultCall: result.Result is not a map[string]interface{}")
 	}
+	return errResult
 }
 
 func (h *ConnectionHandler) mcp_handler_play_music(args interface{}) {
@@ -52,7 +55,14 @@ func (h *ConnectionHandler) mcp_handler_play_music(args interface{}) {
 			h.SystemSpeak("没有找到名为" + songName + "的歌曲")
 		} else {
 			//h.SystemSpeak("这就为您播放音乐: " + songName)
-			h.sendAudioMessage(path, name, h.tts_last_text_index, h.talkRound)
+			h.tts_last_text_index = h.tts_last_text_index + 1
+
+			h.ttsQueue <- struct {
+				text      string
+				round     int
+				textIndex int
+				filepath  string
+			}{name, h.talkRound, h.tts_last_text_index, path}
 		}
 	} else {
 		h.logger.Error("mcp_handler_play_music: args is not a string")

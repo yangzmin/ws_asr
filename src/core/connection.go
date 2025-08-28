@@ -117,6 +117,7 @@ type ConnectionHandler struct {
 		text      string
 		round     int // 轮次
 		textIndex int
+		filepath  string // 如果有path，就直接使用
 	}
 
 	audioMessagesQueue chan struct {
@@ -155,6 +156,7 @@ func NewConnectionHandler(
 			text      string
 			round     int // 轮次
 			textIndex int
+			filepath  string
 		}, 100),
 		audioMessagesQueue: make(chan struct {
 			filepath  string
@@ -395,8 +397,11 @@ func (h *ConnectionHandler) OnAsrResult(result string) bool {
 		if result != "" {
 			h.LogInfo(fmt.Sprintf("[%s] ASR识别结果: %s", h.clientListenMode, h.client_asr_text))
 		}
-		if h.clientVoiceStop {
-			h.handleChatMessage(context.Background(), h.client_asr_text)
+		if h.clientVoiceStop && h.client_asr_text != "" {
+			// 防止重复处理，只处理一次完整的ASR文本
+			asrText := h.client_asr_text
+			h.client_asr_text = "" // 清空文本，防止重复处理
+			h.handleChatMessage(context.Background(), asrText)
 			return true
 		}
 		return false
@@ -586,7 +591,7 @@ func (h *ConnectionHandler) genResponseByLLM(ctx context.Context, messages []pro
 		if content != "" {
 			if strings.Contains(content, "服务响应异常") {
 				h.LogError(fmt.Sprintf("检测到LLM服务异常: %s", content))
-				errorMsg := "抱歉，服务暂时不可用，请稍后再试"
+				errorMsg := "抱歉，LLM服务暂时不可用，请稍后再试"
 				h.tts_last_text_index = 1 // 重置文本索引
 				h.SpeakAndPlay(errorMsg, 1, round)
 				return fmt.Errorf("LLM服务异常")
@@ -606,8 +611,9 @@ func (h *ConnectionHandler) genResponseByLLM(ctx context.Context, messages []pro
 			currentText := fullText[processedChars:]
 
 			// 按标点符号分割
-			if segment, chars := utils.SplitAtLastPunctuation(currentText); chars > 0 {
+			if segment, charsCnt := utils.SplitAtLastPunctuation(currentText); charsCnt > 0 {
 				textIndex++
+				segment = strings.TrimSpace(segment)
 				if textIndex == 1 {
 					now := time.Now()
 					llmSpentTime := now.Sub(llmStartTime)
@@ -620,7 +626,7 @@ func (h *ConnectionHandler) genResponseByLLM(ctx context.Context, messages []pro
 				if err != nil {
 					h.LogError(fmt.Sprintf("播放LLM回复分段失败: %v", err))
 				}
-				processedChars += chars
+				processedChars += charsCnt
 			}
 		}
 	}
@@ -713,6 +719,42 @@ func (h *ConnectionHandler) genResponseByLLM(ctx context.Context, messages []pro
 	return nil
 }
 
+func (h *ConnectionHandler) addToolCallMessage(toolResultText string, functionCallData map[string]interface{}) {
+
+	functionID := functionCallData["id"].(string)
+	functionName := functionCallData["name"].(string)
+	functionArguments := functionCallData["arguments"].(string)
+	h.LogInfo(fmt.Sprintf("函数调用结果: %s", toolResultText))
+	h.LogInfo(fmt.Sprintf("函数调用参数: %s", functionArguments))
+	h.LogInfo(fmt.Sprintf("函数调用名称: %s", functionName))
+	h.LogInfo(fmt.Sprintf("函数调用ID: %s", functionID))
+
+	// 添加 assistant 消息，包含 tool_calls
+	h.dialogueManager.Put(chat.Message{
+		Role: "assistant",
+		ToolCalls: []types.ToolCall{{
+			ID: functionID,
+			Function: types.FunctionCall{
+				Arguments: functionArguments,
+				Name:      functionName,
+			},
+			Type:  "function",
+			Index: 0,
+		}},
+	})
+
+	// 添加 tool 消息
+	toolCallID := functionID
+	if toolCallID == "" {
+		toolCallID = uuid.New().String()
+	}
+	h.dialogueManager.Put(chat.Message{
+		Role:       "tool",
+		ToolCallID: toolCallID,
+		Content:    toolResultText,
+	})
+}
+
 func (h *ConnectionHandler) handleFunctionResult(result types.ActionResponse, functionCallData map[string]interface{}, textIndex int) {
 	switch result.Action {
 	case types.ActionTypeError:
@@ -725,43 +767,13 @@ func (h *ConnectionHandler) handleFunctionResult(result types.ActionResponse, fu
 		h.LogInfo(fmt.Sprintf("函数调用直接回复: %v", result.Response))
 		h.SystemSpeak(result.Response.(string))
 	case types.ActionTypeCallHandler:
-		h.handleMCPResultCall(result)
+		resultStr := h.handleMCPResultCall(result)
+		h.addToolCallMessage(resultStr, functionCallData)
 	case types.ActionTypeReqLLM:
 		h.LogInfo(fmt.Sprintf("函数调用后请求LLM: %v", result.Result))
 		text, ok := result.Result.(string)
 		if ok && len(text) > 0 {
-			functionID := functionCallData["id"].(string)
-			functionName := functionCallData["name"].(string)
-			functionArguments := functionCallData["arguments"].(string)
-			h.LogInfo(fmt.Sprintf("函数调用结果: %s", text))
-			h.LogInfo(fmt.Sprintf("函数调用参数: %s", functionArguments))
-			h.LogInfo(fmt.Sprintf("函数调用名称: %s", functionName))
-			h.LogInfo(fmt.Sprintf("函数调用ID: %s", functionID))
-
-			// 添加 assistant 消息，包含 tool_calls
-			h.dialogueManager.Put(chat.Message{
-				Role: "assistant",
-				ToolCalls: []types.ToolCall{{
-					ID: functionID,
-					Function: types.FunctionCall{
-						Arguments: functionArguments,
-						Name:      functionName,
-					},
-					Type:  "function",
-					Index: 0,
-				}},
-			})
-
-			// 添加 tool 消息
-			toolCallID := functionID
-			if toolCallID == "" {
-				toolCallID = uuid.New().String()
-			}
-			h.dialogueManager.Put(chat.Message{
-				Role:       "tool",
-				ToolCallID: toolCallID,
-				Content:    text,
-			})
+			h.addToolCallMessage(text, functionCallData)
 			h.genResponseByLLM(context.Background(), h.dialogueManager.GetLLMDialogue(), h.talkRound)
 
 		} else {
@@ -779,21 +791,13 @@ func (h *ConnectionHandler) SystemSpeak(text string) error {
 		return errors.New("收到空文本，无法合成语音")
 	}
 	texts := utils.SplitByPunctuation(text)
-	index := 0
+	index := h.tts_last_text_index
 	for _, item := range texts {
 		index++
 		h.tts_last_text_index = index // 重置文本索引
 		h.SpeakAndPlay(item, index, h.talkRound)
 	}
 	return nil
-}
-
-// isNeedAuth 判断是否需要验证
-func (h *ConnectionHandler) isNeedAuth() bool {
-	if !h.config.Server.Auth.Enabled {
-		return false
-	}
-	return !h.isDeviceVerified
 }
 
 // processTTSQueueCoroutine 处理TTS队列
@@ -803,10 +807,9 @@ func (h *ConnectionHandler) processTTSQueueCoroutine() {
 		case <-h.stopChan:
 			return
 		case task := <-h.ttsQueue:
-			h.processTTSTask(task.text, task.textIndex, task.round)
+			h.processTTSTask(task.text, task.textIndex, task.round, task.filepath)
 		}
 	}
-
 }
 
 // 服务端打断说话
@@ -842,8 +845,7 @@ func (h *ConnectionHandler) deleteAudioFileIfNeeded(filepath string, reason stri
 }
 
 // processTTSTask 处理单个TTS任务
-func (h *ConnectionHandler) processTTSTask(text string, textIndex int, round int) {
-	filepath := ""
+func (h *ConnectionHandler) processTTSTask(text string, textIndex int, round int, filepath string) {
 	defer func() {
 		h.audioMessagesQueue <- struct {
 			filepath  string
@@ -852,6 +854,9 @@ func (h *ConnectionHandler) processTTSTask(text string, textIndex int, round int
 			textIndex int
 		}{filepath, text, round, textIndex}
 	}()
+	if filepath != "" {
+		return
+	}
 
 	if utils.IsQuickReplyHit(text, h.config.QuickReplyWords) {
 		// 尝试从缓存查找音频文件
@@ -898,7 +903,6 @@ func (h *ConnectionHandler) processTTSTask(text string, textIndex int, round int
 		ttsSpentTime := now.Sub(ttsStartTime)
 		h.logger.Debug(fmt.Sprintf("TTS转换耗时: %s, 文本: %s, 索引: %d", ttsSpentTime, text, textIndex))
 	}
-
 }
 
 // speakAndPlay 合成并播放语音
@@ -909,7 +913,8 @@ func (h *ConnectionHandler) SpeakAndPlay(text string, textIndex int, round int) 
 			text      string
 			round     int
 			textIndex int
-		}{text, round, textIndex}
+			filepath  string
+		}{text, round, textIndex, ""}
 	}()
 
 	originText := text // 保存原始文本用于日志

@@ -79,13 +79,15 @@ web:
 
 用于 OTA 服务下发给客户端的连接地址，ESP32 客户端会自动从此地址连接 WS，不再手动配置。
 
+注：如果是局域网调试，your-server-ip要配置为**电脑在局域网中的IP**，且终端设备和电脑在同一网段，设备才能通过这个IP地址连到电脑上的服务。
+
 #### OTA 地址配置（必配）
 
 ```text
 http://your-server-ip:8080/api/ota/
 ```
 
-> ESP32 固件内置 OTA 地址，确保该服务地址可用，服务运行后可以在浏览器中输出此地址，确认服务可以访问。
+> ESP32 固件内置 OTA 地址，确保该服务地址可用，**服务运行后可以在浏览器中输出此地址，确认服务可以访问**。
 
 ESP32设备可以在联网界面修改OTA地址，从而在不重新刷固件的情况下，切换后端服务。
 
@@ -192,7 +194,7 @@ swag init -g main.go
 
 欢迎提交 Issue、PR 或新功能建议！
 
-<img src="https://github.com/user-attachments/assets/3b98c03f-2acb-41d9-8de8-8d7b6e1d99fe" width="450" alt="微信群二维码">
+<img src="https://github.com/user-attachments/assets/ceacc885-0f8f-4e35-b3b3-25b49f5ee146" width="450" alt="微信群二维码">
 
 ---
 

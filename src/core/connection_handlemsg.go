@@ -177,6 +177,12 @@ func (h *ConnectionHandler) handleListenMessage(msgMap map[string]interface{}) e
 		h.client_asr_text = ""
 	case "stop":
 		h.clientVoiceStop = true
+		// 重置ASR状态，停止语音识别
+		if h.providers.asr != nil {
+			if err := h.providers.asr.Reset(); err != nil {
+				h.LogError(fmt.Sprintf("重置ASR状态失败: %v", err))
+			}
+		}
 		h.LogInfo("客户端停止语音识别")
 	case "detect":
 		text, hasText := msgMap["text"].(string)
