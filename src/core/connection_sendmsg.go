@@ -47,7 +47,7 @@ func (h *ConnectionHandler) sendTTSMessage(state string, text string, textIndex 
 		"session_id":  h.sessionID,
 		"text":        text,
 		"index":       textIndex,
-		"audio_codec": "opus", // 标识使用Opus编码
+		"audio_codec": h.serverAudioFormat, // 使用动态音频格式，与实际发送的格式保持一致
 	}
 	data, err := json.Marshal(stateMsg)
 	if err != nil {
@@ -112,7 +112,6 @@ func (h *ConnectionHandler) sendAudioMessage(filepath string, text string, textI
 	if len(filepath) == 0 {
 		return
 	}
-	fmt.Println("服务端音频格式:", h.serverAudioFormat)
 
 	// 检查轮次
 	if round != h.talkRound {
@@ -159,8 +158,10 @@ func (h *ConnectionHandler) sendAudioMessage(filepath string, text string, textI
 	if textIndex == 1 {
 		now := time.Now()
 		spentTime := now.Sub(h.roundStartTime)
+		fmt.Println("回复首句耗时:", spentTime, text, round)
 		h.logger.Debug("回复首句耗时 %s 第一句话【%s】, round: %d", spentTime, text, round)
 	}
+	fmt.Println("TTS发送", h.serverAudioFormat, text, "(索引:", textIndex, h.tts_last_text_index, "时长:", duration, "帧数:", len(audioData), ")")
 	h.logger.Debug("TTS发送(%s): \"%s\" (索引:%d/%d，时长:%f，帧数:%d)", h.serverAudioFormat, text, textIndex, h.tts_last_text_index, duration, len(audioData))
 
 	// 分时发送音频数据

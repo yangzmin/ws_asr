@@ -116,6 +116,9 @@
               <button @click="stopAudio" :disabled="!currentAudio" class="stop-btn">
                 ⏹️ 停止
               </button>
+              <button @click="testAudioPlayback" class="test-btn">
+                🔊 测试音频
+              </button>
             </div>
             
             <!-- 音量控制 -->
@@ -146,7 +149,7 @@
         </div>
       </div>
 
-      <!-- 文本聊天区域 -->
+      <!-- 文本聊天区域
       <div class="text-chat-section">
         <h3>文本对话</h3>
         <div class="chat-input-area">
@@ -174,9 +177,9 @@
             </label>
           </div>
         </div>
-      </div>
+      </div> -->
 
-      <!-- 图片上传区域 -->
+      <!-- 图片上传区域 
       <div class="image-upload-section">
         <h3>图片上传</h3>
         <div class="upload-area">
@@ -211,9 +214,9 @@
             </div>
           </div>
         </div>
-      </div>
+      </div>-->
 
-      <!-- 视觉功能区域 -->
+      <!-- 视觉功能区域
       <div class="vision-section">
         <h3>视觉功能</h3>
         <div class="vision-controls">
@@ -258,9 +261,9 @@
             </button>
           </div>
         </div>
-      </div>
+      </div> -->
 
-      <!-- IoT设备控制区域 -->
+      <!-- IoT设备控制区域
       <div class="iot-section">
         <h3>IoT设备控制</h3>
         <div class="iot-controls">
@@ -303,7 +306,7 @@
             </button>
           </div>
         </div>
-      </div>
+      </div> -->
 
       <!-- 对话历史 -->
       <div class="conversation-history">
@@ -351,6 +354,7 @@
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
 import { message } from 'ant-design-vue'
+import PCMPlayer from 'pcm-player'
 
 // WebSocket相关
 const wsRef = ref(null)
@@ -375,7 +379,7 @@ const selectedDevice = ref('')
 
 // 音频参数（严格按照后端协议）
 const audioFormat = ref('pcm')
-const sampleRate = ref(16000)
+const sampleRate = ref(24000)  // 匹配后端AudioToPCMData的目标采样率
 const channels = ref(1)
 const frameDuration = ref(60)
 
@@ -391,6 +395,9 @@ const isAudioPlaying = ref(false)
 const audioChunks = ref([])
 const currentAudio = ref(null)
 const audioChunksCount = ref(0)
+
+// PCM播放器实例
+const pcmPlayer = ref(null)
 
 // LLM 相关
 const llmText = ref('')
@@ -565,10 +572,10 @@ const sendHelloMessage = () => {
  * 为PCM数据添加WAV头
  */
 const addWavHeader = (pcmData) => {
-  const sampleRate = 24000 // 24kHz采样率（与后端AudioToPCMData匹配）
-  const numChannels = 1 // 单声道
+  const currentSampleRate = sampleRate.value // 使用动态采样率配置
+  const numChannels = channels.value // 使用动态声道配置
   const bitsPerSample = 16 // 16位深度
-  const byteRate = sampleRate * numChannels * bitsPerSample / 8
+  const byteRate = currentSampleRate * numChannels * bitsPerSample / 8
   const blockAlign = numChannels * bitsPerSample / 8
   const dataSize = pcmData.length
   const fileSize = 36 + dataSize
@@ -586,7 +593,7 @@ const addWavHeader = (pcmData) => {
   view.setUint32(16, 16, true) // Chunk size
   view.setUint16(20, 1, true) // Audio format (PCM)
   view.setUint16(22, numChannels, true) // Number of channels
-  view.setUint32(24, sampleRate, true) // Sample rate
+  view.setUint32(24, currentSampleRate, true) // Sample rate
   view.setUint32(28, byteRate, true) // Byte rate
   view.setUint16(32, blockAlign, true) // Block align
   view.setUint16(34, bitsPerSample, true) // Bits per sample
@@ -607,146 +614,32 @@ const addWavHeader = (pcmData) => {
  * 将原始Opus数据包装成简单的OGG容器
  * 注意：这是一个简化的实现，主要用于处理后端发送的Opus数据包
  */
-const wrapOpusInOgg = (opusData) => {
-  console.log('尝试将Opus数据包装成OGG容器，数据大小:', opusData.byteLength)
-  
-  // 创建OpusHead页面（标识头）
-  const createOpusHead = () => {
-    const headData = new Uint8Array(19)
-    // OpusHead标识
-    const opusHead = 'OpusHead'
-    for (let i = 0; i < opusHead.length; i++) {
-      headData[i] = opusHead.charCodeAt(i)
-    }
-    // 版本
-    headData[8] = 1
-    // 通道数
-    headData[9] = 1
-    // 预跳过样本数（16位小端序）
-    headData[10] = 0
-    headData[11] = 0
-    // 原始输入采样率（32位小端序，24000Hz）
-    headData[12] = 0xC0
-    headData[13] = 0x5D
-    headData[14] = 0x00
-    headData[15] = 0x00
-    // 输出增益（16位小端序）
-    headData[16] = 0
-    headData[17] = 0
-    // 通道映射族
-    headData[18] = 0
-    
-    return headData
-  }
-  
-  // 创建OGG页面
-  const createOggPage = (data, isFirst = false, isLast = false, pageSeq = 0) => {
-    const pageSize = 27 + 1 + data.length
-    const buffer = new ArrayBuffer(pageSize)
-    const view = new DataView(buffer)
-    const uint8View = new Uint8Array(buffer)
-    
-    // OGG页面标识符 "OggS"
-    uint8View[0] = 0x4F
-    uint8View[1] = 0x67
-    uint8View[2] = 0x67
-    uint8View[3] = 0x53
-    
-    // 版本
-    uint8View[4] = 0x00
-    
-    // 头类型标志
-    let headerType = 0
-    if (isFirst) headerType |= 0x02
-    if (isLast) headerType |= 0x04
-    uint8View[5] = headerType
-    
-    // 颗粒位置（64位，简化为0）
-    for (let i = 6; i < 14; i++) {
-      uint8View[i] = 0
-    }
-    
-    // 流序列号（32位，简化为0）
-    view.setUint32(14, 0, true)
-    
-    // 页面序列号
-    view.setUint32(18, pageSeq, true)
-    
-    // CRC校验和（简化为0）
-    view.setUint32(22, 0, true)
-    
-    // 页面段数
-    uint8View[26] = 1
-    
-    // 段表
-    uint8View[27] = Math.min(data.length, 255)
-    
-    // 数据
-    uint8View.set(data, 28)
-    
-    return buffer
-  }
-  
-  try {
-    // 创建OpusHead页面
-    const opusHead = createOpusHead()
-    const headPage = createOggPage(opusHead, true, false, 0)
-    
-    // 将Opus数据分割成合适的块
-    const opusDataArray = new Uint8Array(opusData)
-    const chunks = []
-    const chunkSize = 1024 // 每个OGG页面最大1KB
-    
-    for (let i = 0; i < opusDataArray.length; i += chunkSize) {
-      const chunk = opusDataArray.slice(i, i + chunkSize)
-      chunks.push(chunk)
-    }
-    
-    // 创建数据页面
-    const dataPages = chunks.map((chunk, index) => {
-      const isLast = index === chunks.length - 1
-      return createOggPage(chunk, false, isLast, index + 1)
-    })
-    
-    // 合并所有页面
-    const totalSize = headPage.byteLength + dataPages.reduce((sum, page) => sum + page.byteLength, 0)
-    const result = new ArrayBuffer(totalSize)
-    const resultView = new Uint8Array(result)
-    
-    let offset = 0
-    // 添加头页面
-    resultView.set(new Uint8Array(headPage), offset)
-    offset += headPage.byteLength
-    
-    // 添加数据页面
-    dataPages.forEach(page => {
-      resultView.set(new Uint8Array(page), offset)
-      offset += page.byteLength
-    })
-    
-    console.log('OGG容器创建完成，总大小:', totalSize, '字节')
-    return result
-    
-  } catch (error) {
-    console.error('创建OGG容器失败:', error)
-    return opusData // 如果失败，返回原始数据
-  }
-}
+
 
 /**
- * 处理音频数据
+ * 处理音频数据 - 直接处理PCM格式
+ */
+/**
+ * 处理接收到的PCM音频数据
+ * 后端发送的是完整的PCM数据块，前端需要直接播放
+ */
+/**
+ * 处理接收到的PCM音频数据
+ * 使用PCMPlayer直接播放，无需转换为WAV格式
  */
 const handleAudioData = async (data) => {
   try {
-    console.log('收到音频数据:', {
+    console.log('收到PCM音频数据:', {
       type: data.constructor.name,
-      size: data.byteLength || data.size,
-      isArrayBuffer: data instanceof ArrayBuffer,
-      isBlob: data instanceof Blob
+      size: data.byteLength || data.size
     })
     
-    // 添加详细的调试信息
-    addMessage('debug', `收到音频数据: ${data.constructor.name}, 大小: ${(data.byteLength || data.size || 0)} 字节`)
+    // 检查PCMPlayer是否已初始化
+    if (!pcmPlayer.value) {
+      console.error('PCM播放器未初始化')
+      addMessage('error', 'PCM播放器未初始化')
+      return
+    }
     
     // 检查数据是否有效
     const dataSize = data.byteLength || data.size || 0
@@ -764,82 +657,220 @@ const handleAudioData = async (data) => {
       return
     }
     
-    // 如果是ArrayBuffer，转换为Blob
-    let audioBlob
+    // 处理PCM数据并直接播放
     if (data instanceof ArrayBuffer) {
-      // 检查数据内容
-      const uint8Array = new Uint8Array(data)
-      console.log('音频数据前16字节:', Array.from(uint8Array.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' '))
+      console.log('使用PCMPlayer播放PCM数据，大小:', dataSize, '字节')
+      console.log('PCM数据前16字节:', Array.from(new Uint8Array(data.slice(0, 16))).map(b => b.toString(16).padStart(2, '0')).join(' '))
+      addMessage('debug', `PCMPlayer播放PCM数据: ${dataSize} 字节`)
       
-      // 尝试识别音频格式
-      let mimeType = 'audio/wav' // 默认WAV
-      let processedData = data
-      
-      if (uint8Array[0] === 0x4F && uint8Array[1] === 0x67 && uint8Array[2] === 0x67 && uint8Array[3] === 0x53) {
-        mimeType = 'audio/ogg' // OGG格式
-        console.log('检测到OGG格式音频')
-        addMessage('debug', '检测到OGG格式音频')
-      } else if (uint8Array[0] === 0xFF && (uint8Array[1] & 0xE0) === 0xE0) {
-        mimeType = 'audio/mpeg' // MP3格式
-        console.log('检测到MP3格式音频')
-        addMessage('debug', '检测到MP3格式音频')
-      } else if (uint8Array[0] === 0x52 && uint8Array[1] === 0x49 && uint8Array[2] === 0x46 && uint8Array[3] === 0x46) {
-        mimeType = 'audio/wav' // WAV格式
-        console.log('检测到WAV格式音频')
-        addMessage('debug', '检测到WAV格式音频')
-      } else {
-        // 根据后端日志确认，服务端发送的是PCM格式数据
-        // 直接作为PCM数据处理，添加WAV头
-        console.log('检测到PCM原始数据（后端确认格式），添加WAV头')
-        addMessage('debug', '检测到PCM原始数据（后端确认格式），正在添加WAV头')
-        processedData = addWavHeader(uint8Array)
-        mimeType = 'audio/wav'
+      // 检查数据长度是否合理（应该是偶数，因为16位PCM每个样本2字节）
+      if (dataSize % 2 !== 0) {
+        console.warn('PCM数据长度不是偶数，可能有问题')
+        addMessage('warning', 'PCM数据长度异常')
       }
       
-      audioBlob = new Blob([processedData], { type: mimeType })
-      console.log('检测到音频格式:', mimeType)
-      addMessage('debug', `创建音频Blob: ${mimeType}, 大小: ${audioBlob.size} 字节`)
-    } else if (data instanceof Blob) {
-      audioBlob = data
+      // 直接将PCM数据喂给PCMPlayer
+      pcmPlayer.value.feed(data)
       
-      // 检查Blob内容
+      console.log('PCM数据已发送到播放器')
+      addMessage('success', 'PCM音频播放中...')
+      
+    } else if (data instanceof Blob) {
+      // 如果是Blob，需要转换为ArrayBuffer
+      console.log('将Blob转换为ArrayBuffer后播放')
       const arrayBuffer = await data.arrayBuffer()
-      const uint8Array = new Uint8Array(arrayBuffer)
-      console.log('Blob音频数据前16字节:', Array.from(uint8Array.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' '))
+      pcmPlayer.value.feed(arrayBuffer)
+      addMessage('success', 'PCM音频播放中...')
     } else {
-      console.error('未知的音频数据类型:', typeof data)
-      addMessage('error', `未知的音频数据类型: ${typeof data}`)
+      console.error('不支持的音频数据类型:', typeof data)
+      addMessage('error', `不支持的音频数据类型: ${typeof data}`)
       return
     }
     
-    // 验证音频数据的有效性
-    if (audioBlob.size === 0) {
-      console.warn('音频Blob为空')
-      addMessage('warning', '音频数据为空')
-      return
-    }
-    
-    // 将处理后的音频数据添加到数组中
-    audioChunks.value.push(audioBlob)
-    audioChunksCount.value = audioChunks.value.length
+    // 更新音频状态
     hasAudio.value = true
-    
-    console.log('音频数据已添加，当前总块数:', audioChunks.value.length)
-    addMessage('audio', `接收音频数据: ${(audioBlob.size / 1024).toFixed(2)}KB`)
+    isAudioPlaying.value = true
+    ttsStatus.value = 'playing'
     
   } catch (error) {
     console.error('处理音频数据时出错:', error)
-    addMessage('error', `音频处理失败: ${error.message}`)
-    
-    // 尝试恢复
-    if (error.name === 'QuotaExceededError') {
-      addMessage('warning', '音频缓存已满，清理旧数据')
-      // 清理一半的旧音频数据
-      const halfLength = Math.floor(audioChunks.value.length / 2)
-      audioChunks.value.splice(0, halfLength)
-      audioChunksCount.value = audioChunks.value.length
-    }
+    addMessage('error', `音频处理失败: ${error?.message || '未知错误'}`)
+    ttsStatus.value = 'error'
   }
+}
+
+// 音频播放队列
+const audioQueue = ref([])
+const isProcessingQueue = ref(false)
+
+/**
+ * 生成测试音频数据（440Hz正弦波）
+ */
+const generateTestAudio = () => {
+  const sampleRate = 24000
+  const duration = 1 // 1秒
+  const frequency = 440 // A4音符
+  const samples = sampleRate * duration
+  
+  const pcmData = new Uint8Array(samples * 2) // 16位PCM，每个样本2字节
+  
+  for (let i = 0; i < samples; i++) {
+    const sample = Math.sin(2 * Math.PI * frequency * i / sampleRate) * 0.3 // 30%音量
+    const intSample = Math.round(sample * 32767) // 转换为16位整数
+    
+    // 小端序存储
+    pcmData[i * 2] = intSample & 0xFF // 低字节
+    pcmData[i * 2 + 1] = (intSample >> 8) & 0xFF // 高字节
+  }
+  
+  return pcmData
+}
+
+/**
+ * 测试音频播放
+ */
+/**
+ * 测试PCM音频播放
+ * 使用PCMPlayer直接播放生成的测试PCM数据
+ */
+const testAudioPlayback = async () => {
+  try {
+    console.log('生成测试PCM音频...')
+    
+    // 检查PCMPlayer是否已初始化
+    if (!pcmPlayer.value) {
+      console.error('PCM播放器未初始化，无法测试')
+      addMessage('error', 'PCM播放器未初始化，无法测试')
+      return
+    }
+    
+    const testPcmData = generateTestAudio()
+    
+    console.log('测试PCM数据大小:', testPcmData.length, '字节')
+    console.log('测试PCM数据前16字节:', Array.from(testPcmData.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' '))
+    addMessage('debug', `测试PCM音频生成完成: ${testPcmData.length} 字节`)
+    
+    // 使用PCMPlayer直接播放PCM数据
+    console.log('使用PCMPlayer播放测试音频...')
+    pcmPlayer.value.feed(testPcmData.buffer)
+    
+    // 更新播放状态
+    isAudioPlaying.value = true
+    ttsStatus.value = 'playing'
+    hasAudio.value = true
+    
+    console.log('测试PCM音频播放开始')
+    addMessage('success', '测试PCM音频播放开始')
+    
+  } catch (error) {
+    console.error('测试音频播放失败:', error)
+    addMessage('error', `测试音频播放失败: ${error?.message || '未知错误'}`)
+    ttsStatus.value = 'error'
+  }
+}
+
+/**
+ * 直接播放音频Blob
+ * 实现队列式音频播放，避免播放冲突
+ */
+const playAudioBlob = async (audioBlob) => {
+  // 将音频添加到队列
+  audioQueue.value.push(audioBlob)
+  
+  // 如果没有正在处理队列，开始处理
+  if (!isProcessingQueue.value) {
+    await processAudioQueue()
+  }
+}
+
+/**
+ * 处理音频播放队列
+ */
+const processAudioQueue = async () => {
+  if (isProcessingQueue.value || audioQueue.value.length === 0) {
+    return
+  }
+  
+  isProcessingQueue.value = true
+  
+  while (audioQueue.value.length > 0) {
+    const audioBlob = audioQueue.value.shift()
+    await playAudioBlobDirect(audioBlob)
+  }
+  
+  isProcessingQueue.value = false
+}
+
+/**
+ * 直接播放单个音频Blob
+ */
+const playAudioBlobDirect = async (audioBlob) => {
+  return new Promise((resolve, reject) => {
+    try {
+      // 创建新的音频对象
+      const audio = new Audio()
+      const audioUrl = URL.createObjectURL(audioBlob)
+      audio.src = audioUrl
+    
+      // 设置音频事件监听器
+      audio.addEventListener('loadstart', () => {
+        console.log('开始加载WAV音频')
+        addMessage('debug', '开始加载WAV音频')
+      })
+      
+      audio.addEventListener('canplay', () => {
+        console.log('WAV音频可以播放')
+        addMessage('debug', 'WAV音频可以播放')
+      })
+      
+      audio.addEventListener('play', () => {
+        console.log('WAV音频开始播放')
+        addMessage('audio', 'WAV音频开始播放')
+        isAudioPlaying.value = true
+        ttsStatus.value = 'playing'
+      })
+      
+      audio.addEventListener('ended', () => {
+        console.log('WAV音频播放完成')
+        addMessage('audio', 'WAV音频播放完成')
+        isAudioPlaying.value = false
+        ttsStatus.value = 'idle'
+        
+        // 清理资源
+        URL.revokeObjectURL(audioUrl)
+        resolve()
+      })
+      
+      audio.addEventListener('error', (e) => {
+        console.error('WAV音频播放错误:', e)
+        const errorMsg = e.error?.message || e.message || '音频格式不支持或文件损坏'
+        addMessage('error', `WAV音频播放错误: ${errorMsg}`)
+        isAudioPlaying.value = false
+        ttsStatus.value = 'idle'
+        
+        // 清理资源
+        URL.revokeObjectURL(audioUrl)
+        reject(new Error(errorMsg))
+      })
+      
+      // 设置当前音频引用
+      currentAudio.value = audio
+      
+      // 开始播放
+      audio.play().catch(error => {
+        console.error('播放音频失败:', error)
+        const errorMsg = error?.message || '播放失败'
+        addMessage('error', `播放音频失败: ${errorMsg}`)
+        URL.revokeObjectURL(audioUrl)
+        reject(new Error(errorMsg))
+      })
+      
+    } catch (error) {
+      console.error('创建音频对象失败:', error)
+      addMessage('error', `创建音频对象失败: ${error.message}`)
+      reject(error)
+    }
+  })
 }
 
 /**
@@ -1144,7 +1175,7 @@ const startRecording = async () => {
     asrText.value = ''
     
     // 发送listen start消息
-    sendListenMessage('start')
+    // sendListenMessage('start')
     
     // 创建音频处理器
     createAudioProcessor(stream)
@@ -1264,7 +1295,7 @@ const startListening = () => {
   }
   
   isListening.value = true
-  sendListenMessage('listen')
+  sendListenMessage('start')
   addMessage('system', '开始ASR监听')
 }
 
@@ -1637,7 +1668,7 @@ const playCurrentSentence = async () => {
 }
 
 /**
- * 创建并播放音频
+ * 创建并播放音频 - 直接播放WAV格式
  */
 const createAndPlayAudio = async () => {
   if (audioChunks.value.length === 0) {
@@ -1646,230 +1677,59 @@ const createAndPlayAudio = async () => {
   }
   
   try {
-    // 处理不同类型的音频数据
-    const audioBlobs = []
+    console.log('开始播放PCM音频，数据块数量:', audioChunks.value.length)
     
-    for (const chunk of audioChunks.value) {
-      if (chunk instanceof ArrayBuffer) {
-        audioBlobs.push(new Blob([chunk]))
-      } else if (chunk instanceof Blob) {
-        audioBlobs.push(chunk)
-      } else {
-        // 如果是其他类型，尝试转换为ArrayBuffer
-        audioBlobs.push(new Blob([new Uint8Array(chunk)]))
-      }
+    // 检查是否有有效的音频数据
+    if (audioChunks.value.length === 0) {
+      throw new Error('没有音频数据可播放')
     }
     
-    // 合并所有音频数据并创建音频对象
-    console.log('开始创建和播放音频，数据块数量:', audioBlobs.length)
-  console.log('音频数据总大小:', audioBlobs.reduce((total, blob) => total + blob.size, 0), '字节')
-  
-  // 详细检查每个音频块
-  audioBlobs.forEach((blob, index) => {
-    console.log(`音频块 ${index + 1}:`, {
-      size: blob.size,
-      type: blob.type || '未知类型'
-    })
-  })
-  
-  // 检查是否有有效的音频数据
-  if (audioBlobs.length === 0) {
-    throw new Error('没有音频数据可播放')
-  }
-  
-  const totalSize = audioBlobs.reduce((total, blob) => total + blob.size, 0)
-  if (totalSize === 0) {
-    throw new Error('音频数据为空')
-  }
-    
-    // 检测音频格式
-    const detectAudioFormat = (audioData) => {
-      if (!audioData || audioData.length === 0) return null
-      
-      const firstBytes = new Uint8Array(audioData.slice(0, 16))
-      console.log('音频数据前16字节:', Array.from(firstBytes).map(b => b.toString(16).padStart(2, '0')).join(' '))
-      
-      // WAV格式检测 (RIFF...WAVE)
-      if (firstBytes[0] === 0x52 && firstBytes[1] === 0x49 && firstBytes[2] === 0x46 && firstBytes[3] === 0x46 &&
-          firstBytes[8] === 0x57 && firstBytes[9] === 0x41 && firstBytes[10] === 0x56 && firstBytes[11] === 0x45) {
-        return { type: 'audio/wav', name: 'WAV (检测)' }
-      }
-      
-      // MP3格式检测 (ID3 tag或MP3 frame header)
-      if ((firstBytes[0] === 0x49 && firstBytes[1] === 0x44 && firstBytes[2] === 0x33) || // ID3v2
-          (firstBytes[0] === 0xFF && (firstBytes[1] & 0xE0) === 0xE0)) { // MP3 frame header
-        return { type: 'audio/mpeg', name: 'MP3 (检测)' }
-      }
-      
-      // OGG格式检测 (包含Opus)
-      if (firstBytes[0] === 0x4F && firstBytes[1] === 0x67 && firstBytes[2] === 0x67 && firstBytes[3] === 0x53) {
-        // 检查是否是Opus编码的OGG
-        if (firstBytes.length >= 16) {
-          const opusSignature = 'OpusHead'
-          let isOpus = true
-          for (let i = 0; i < opusSignature.length && i + 8 < firstBytes.length; i++) {
-            if (firstBytes[i + 8] !== opusSignature.charCodeAt(i)) {
-              isOpus = false
-              break
-            }
-          }
-          if (isOpus) {
-            return { type: 'audio/ogg; codecs=opus', name: 'OGG-Opus (检测)' }
-          }
-        }
-        return { type: 'audio/ogg', name: 'OGG (检测)' }
-      }
-      
-      // WebM格式检测
-      if (firstBytes[0] === 0x1A && firstBytes[1] === 0x45 && firstBytes[2] === 0xDF && firstBytes[3] === 0xA3) {
-        return { type: 'audio/webm', name: 'WebM (检测)' }
-      }
-      
-      // 原始Opus数据检测（没有容器格式）
-      // Opus数据包通常以特定的模式开始，但这很难准确检测
-      // 如果前面的格式都不匹配，且数据看起来像是编码的音频数据，尝试作为Opus处理
-      if (firstBytes.length >= 4) {
-        // 检查是否可能是原始Opus数据
-        const hasNonZero = firstBytes.some(byte => byte !== 0)
-        const hasVariation = new Set(firstBytes.slice(0, 8)).size > 2
-        if (hasNonZero && hasVariation) {
-          console.log('可能是原始Opus数据，尝试OGG容器格式')
-          return { type: 'audio/ogg; codecs=opus', name: 'Raw-Opus (推测)' }
-        }
-      }
-      
-      return null
+    const totalSize = audioChunks.value.reduce((total, blob) => total + blob.size, 0)
+    if (totalSize === 0) {
+      throw new Error('音频数据为空')
     }
     
-    // 检查第一个音频块的格式
-    let detectedFormat = null
-    if (audioBlobs.length > 0) {
-      const firstBlob = audioBlobs[0]
-      const arrayBuffer = await firstBlob.arrayBuffer()
-      detectedFormat = detectAudioFormat(new Uint8Array(arrayBuffer))
-      console.log('检测到的音频格式:', detectedFormat)
-    }
+    console.log('音频数据总大小:', totalSize, '字节')
     
-    // 尝试不同的音频格式，优先使用检测到的格式
-    const audioFormats = [
-      // 如果检测到格式，优先使用检测到的格式
-      ...(detectedFormat ? [detectedFormat] : []),
-      { type: 'audio/wav', name: 'WAV' },
-      { type: 'audio/mpeg', name: 'MP3' },
-      { type: 'audio/mp3', name: 'MP3-Alt' },
-      { type: 'audio/ogg', name: 'OGG' },
-      { type: 'audio/ogg; codecs=opus', name: 'OGG-Opus' },
-      { type: 'audio/webm', name: 'WebM' },
-      { type: 'audio/webm; codecs=opus', name: 'WebM-Opus' },
-      { type: 'audio/x-wav', name: 'X-WAV' },
-      { type: 'audio/wave', name: 'WAVE' },
-      { type: '', name: '默认' } // 不指定类型，让浏览器自动检测
-    ]
+    // 直接合并所有WAV格式的音频块
+    console.log('合并WAV音频块')
+    const combinedBlob = new Blob(audioChunks.value, { type: 'audio/wav' })
+    const audioUrl = URL.createObjectURL(combinedBlob)
+    const audio = new Audio(audioUrl)
+    audio.preload = 'auto'
     
-    let audioUrl = null
-    let audio = null
-    let successFormat = null
-    
-    // 如果只有一个音频块，直接使用它
-    if (audioBlobs.length === 1) {
-      console.log('使用单个音频块')
-      const singleBlob = audioBlobs[0]
-      
-      for (const format of audioFormats) {
-        try {
-          console.log(`尝试格式: ${format.name} (${format.type})`)
-          
-          // 如果有检测到的格式且当前格式匹配，或者没有指定类型，直接使用原始blob
-          if ((detectedFormat && format.type === detectedFormat.type) || !format.type) {
-            audioUrl = URL.createObjectURL(singleBlob)
-          } else {
-            // 创建指定类型的新blob
-            const typedBlob = new Blob([singleBlob], { type: format.type })
-            audioUrl = URL.createObjectURL(typedBlob)
-          }
-          
-          audio = new Audio(audioUrl)
-          audio.preload = 'auto'
-          successFormat = format.name
-          console.log(`使用格式: ${format.name}`)
-          break
-          
-        } catch (formatError) {
-          console.log(`格式 ${format.name} 创建失败:`, formatError.message)
-          if (audioUrl) {
-            URL.revokeObjectURL(audioUrl)
-            audioUrl = null
-          }
-          audio = null
-          continue
-        }
-      }
-    } else {
-      // 多个音频块需要合并
-      console.log('合并多个音频块')
-      for (const format of audioFormats) {
-        try {
-          console.log(`尝试格式: ${format.name} (${format.type})`)
-          
-          const combinedBlob = new Blob(audioBlobs, format.type ? { type: format.type } : {})
-          audioUrl = URL.createObjectURL(combinedBlob)
-          audio = new Audio(audioUrl)
-          audio.preload = 'auto'
-          successFormat = format.name
-          console.log(`使用格式: ${format.name}`)
-          break
-          
-        } catch (formatError) {
-          console.log(`格式 ${format.name} 创建失败:`, formatError.message)
-          if (audioUrl) {
-            URL.revokeObjectURL(audioUrl)
-            audioUrl = null
-          }
-          audio = null
-          continue
-        }
-      }
-    }
-    
-    if (!audio || !audioUrl) {
-      // 如果所有格式都失败，尝试最基本的方式
-      console.log('尝试基本音频创建方式')
-      const combinedBlob = new Blob(audioBlobs)
-      audioUrl = URL.createObjectURL(combinedBlob)
-      audio = new Audio(audioUrl)
-      successFormat = '基本格式'
-    }
+    console.log('创建WAV音频对象，大小:', combinedBlob.size, '字节')
     
     // 设置音频事件监听器
     audio.onloadstart = () => {
-      console.log(`音频开始加载，使用格式: ${successFormat}`)
+      console.log('WAV音频开始加载')
     }
     
     audio.onloadeddata = () => {
-      console.log('音频数据加载完成')
+      console.log('WAV音频数据加载完成')
     }
     
     audio.oncanplay = () => {
-      console.log('音频可以开始播放')
+      console.log('WAV音频可以开始播放')
     }
     
     audio.onplay = () => {
       isAudioPlaying.value = true
       ttsStatus.value = 'playing'
-      console.log('音频开始播放')
-      addMessage('system', `开始播放TTS音频 (${successFormat})`)
+      console.log('WAV音频开始播放')
+      addMessage('system', '开始播放PCM-WAV音频')
     }
     
     audio.onended = () => {
       isAudioPlaying.value = false
       ttsStatus.value = 'idle'
       URL.revokeObjectURL(audioUrl)
-      console.log('音频播放完成')
-      addMessage('system', 'TTS音频播放完成')
+      console.log('WAV音频播放完成')
+      addMessage('system', 'PCM-WAV音频播放完成')
     }
     
     audio.onerror = (error) => {
-      console.error('音频播放错误:', error)
+      console.error('WAV音频播放错误:', error)
       console.error('音频错误详情:', {
         error: audio.error,
         networkState: audio.networkState,
@@ -1880,13 +1740,13 @@ const createAndPlayAudio = async () => {
       ttsStatus.value = 'error'
       URL.revokeObjectURL(audioUrl)
       
-      const errorMsg = audio.error ? `音频播放失败 (错误代码: ${audio.error.code})` : '音频播放失败'
+      const errorMsg = audio.error ? `WAV音频播放失败 (错误代码: ${audio.error.code})` : 'WAV音频播放失败'
       message.error(errorMsg)
       addMessage('error', errorMsg)
     }
     
     audio.onpause = () => {
-      console.log('音频暂停')
+      console.log('WAV音频暂停')
     }
     
     // 设置音量和其他属性
@@ -1917,7 +1777,15 @@ const createAndPlayAudio = async () => {
  * 播放音频
  */
 const playAudio = () => {
-  if (audioChunks.value.length > 0) {
+  // 检查是否有队列中的音频或已缓存的音频
+  if (audioQueue.value.length > 0) {
+    console.log('播放队列中的音频')
+    addMessage('system', '开始播放队列音频')
+    if (!isProcessingQueue.value) {
+      processAudioQueue()
+    }
+  } else if (audioChunks.value.length > 0) {
+    console.log('播放缓存的音频')
     createAndPlayAudio()
   } else {
     console.warn('没有音频数据可播放')
@@ -1928,14 +1796,32 @@ const playAudio = () => {
 /**
  * 停止音频播放
  */
+/**
+ * 停止音频播放
+ * 支持传统Audio对象和PCMPlayer
+ */
 const stopAudio = () => {
+  // 清空音频队列
+  audioQueue.value = []
+  isProcessingQueue.value = false
+  
+  // 停止PCMPlayer
+  if (pcmPlayer.value) {
+    try {
+      pcmPlayer.value.pause()
+      console.log('PCM播放器已停止')
+      addMessage('system', 'PCM播放器已停止')
+    } catch (error) {
+      console.warn('停止PCM播放器时出错:', error)
+    }
+  }
+  
+  // 停止传统Audio对象
   if (currentAudio.value) {
     currentAudio.value.pause()
     currentAudio.value.currentTime = 0
-    isAudioPlaying.value = false
-    ttsStatus.value = 'idle'
-    console.log('音频播放已停止')
-    addMessage('system', '音频播放已停止')
+    console.log('传统音频播放已停止')
+    addMessage('system', '传统音频播放已停止')
     
     // 清理音频资源
     if (currentAudio.value.src) {
@@ -1943,36 +1829,94 @@ const stopAudio = () => {
     }
     currentAudio.value = null
   }
+  
+  // 更新状态
+  isAudioPlaying.value = false
+  ttsStatus.value = 'idle'
 }
 
 /**
  * 暂停音频播放
+ * 支持传统Audio对象和PCMPlayer
  */
 const pauseAudio = () => {
+  let paused = false
+  
+  // 暂停PCMPlayer
+  if (pcmPlayer.value) {
+    try {
+      pcmPlayer.value.pause()
+      paused = true
+      console.log('PCM播放器已暂停')
+      addMessage('system', 'PCM播放器已暂停')
+    } catch (error) {
+      console.warn('暂停PCM播放器时出错:', error)
+    }
+  }
+  
+  // 暂停传统Audio对象
   if (currentAudio.value && !currentAudio.value.paused) {
     currentAudio.value.pause()
+    paused = true
+    console.log('传统音频播放已暂停')
+    addMessage('system', '传统音频播放已暂停')
+  }
+  
+  if (paused) {
     isAudioPlaying.value = false
     ttsStatus.value = 'paused'
-    console.log('音频播放已暂停')
-    addMessage('system', '音频播放已暂停')
   }
 }
 
 /**
  * 恢复音频播放
+ * 支持传统Audio对象和PCMPlayer
  */
 const resumeAudio = () => {
-  if (currentAudio.value && currentAudio.value.paused) {
+  let resumed = false
+  
+  // 恢复PCMPlayer播放
+  if (pcmPlayer.value) {
     try {
-      currentAudio.value.play()
-      isAudioPlaying.value = true
-      ttsStatus.value = 'playing'
-      console.log('音频播放已恢复')
-      addMessage('system', '音频播放已恢复')
+      pcmPlayer.value.continue()
+      resumed = true
+      console.log('PCM播放器已恢复')
+      addMessage('system', 'PCM播放器已恢复')
     } catch (error) {
-      console.error('恢复播放失败:', error)
-      addMessage('error', `恢复播放失败: ${error.message}`)
+      console.warn('恢复PCM播放器时出错:', error)
     }
+  }
+  
+  // 恢复传统Audio对象播放
+  if (currentAudio.value && currentAudio.value.paused) {
+    // 检查音频是否有有效的源
+    if (!currentAudio.value.src || currentAudio.value.src === '') {
+      console.warn('音频没有有效的源，无法恢复播放')
+      if (!resumed) {
+        addMessage('warning', '没有可播放的音频')
+      }
+      return
+    }
+    
+    currentAudio.value.play().then(() => {
+      resumed = true
+      console.log('传统音频播放已恢复')
+      addMessage('system', '传统音频播放已恢复')
+    }).catch(error => {
+      console.error('恢复播放失败:', error)
+      const errorMsg = error?.message || '播放失败'
+      if (!resumed) {
+        addMessage('error', `恢复播放失败: ${errorMsg}`)
+      }
+    })
+  }
+  
+  if (resumed) {
+    isAudioPlaying.value = true
+    ttsStatus.value = 'playing'
+  } else if (!pcmPlayer.value && !currentAudio.value) {
+    console.warn('没有可恢复的音频')
+    addMessage('warning', '没有可恢复的音频')
   }
 }
 
@@ -2084,6 +2028,16 @@ const formatTime = (date) => {
 
 // 生命周期
 onMounted(() => {
+  // 初始化PCM播放器
+  pcmPlayer.value = new PCMPlayer({
+    inputCodec: 'Int16',    // 16位整数PCM
+    channels: 1,           // 单声道
+    sampleRate: 24000,     // 24kHz采样率，与后端配置一致
+    flushTime: 1000        // 1秒缓冲时间
+  })
+  
+  console.log('PCM播放器初始化完成:', pcmPlayer.value)
+  
   connectWebSocket()
   getAudioDevices()
 })
@@ -2099,6 +2053,12 @@ onUnmounted(() => {
   
   if (currentAudio.value) {
     currentAudio.value.pause()
+  }
+  
+  // 清理PCM播放器
+  if (pcmPlayer.value) {
+    pcmPlayer.value.destroy()
+    pcmPlayer.value = null
   }
   
   // 清理图片预览URL

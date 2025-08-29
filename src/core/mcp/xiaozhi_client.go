@@ -336,7 +336,7 @@ func (c *XiaoZhiMCPClient) SendMCPInitializeMessage() error {
 					},
 				},
 				"clientInfo": map[string]interface{}{
-					"name":    "XiaozhiClient",
+					"name":    "angrymiao client",
 					"version": "1.0.0",
 				},
 			},

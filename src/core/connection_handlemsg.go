@@ -69,6 +69,7 @@ func (h *ConnectionHandler) processClientTextMessage(ctx context.Context, text s
 	}
 
 	// 根据消息类型分发处理
+	fmt.Println("msgMap", msgMap)
 	msgType, ok := msgMap["type"].(string)
 	if !ok {
 		return fmt.Errorf("消息类型错误")
