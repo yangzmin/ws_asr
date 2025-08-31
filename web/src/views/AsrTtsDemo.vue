@@ -437,7 +437,7 @@ const connectWebSocket = () => {
   }
   
   // 根据配置文件，WebSocket服务器运行在8000端口
-  const wsUrl = `ws://localhost:8000/`
+  const wsUrl = `wss://ai-server-test.angrymiao.com/ws`
   
   const ws = new WebSocket(wsUrl)
   
