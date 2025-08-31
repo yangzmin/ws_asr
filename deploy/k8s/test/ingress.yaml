@@ -1,0 +1,36 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: miao-coin-ai-server
+  namespace: angrymiao-test
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "*"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization,Access-Control-Allow-Origin "
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+
+spec:
+  rules:
+    - host: ai-server-test.angrymiao.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: miao-coin-ai-server-service
+                port:
+                  number: 80
+          - path: /ws
+            pathType: Prefix
+            backend:
+              service:
+                name: miao-coin-ai-server-service
+                port:
+                  number: 8000
+  tls:
+    - hosts:
+        - ai-server-test.angrymiao.com
+      secretName: am-tls

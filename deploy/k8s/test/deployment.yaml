@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: miao-coin-ai-server-deployment
+  namespace: angrymiao-test
+spec:
+  selector:
+    matchLabels:
+      app: miao-coin-ai-server
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: miao-coin-ai-server
+    spec:
+      containers:
+        - name: miao-coin-ai-server
+          image: registry.cn-shenzhen.aliyuncs.com/angrymiao/miao-coin:ai-server-test-01
+          imagePullPolicy: Always
+          env:
+            - name: WORKER_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          resources:
+            requests:
+              memory: "500Mi"
+              cpu: "500m"
+            limits:
+              memory: "500Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: app-config
+              mountPath: /app/config
+      imagePullSecrets:
+        - name: aliyun-reg-secret
+      volumes:
+        - name: app-config
+          configMap:
+            name: test-miao-coin-config

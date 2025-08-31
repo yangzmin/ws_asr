@@ -11,3 +11,7 @@ wake_replay
 .env
 config.db
 /ota_bin
+/web/node_modules
+/web/pkg
+/_build
+/.vscode
