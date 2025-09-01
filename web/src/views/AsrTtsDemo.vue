@@ -149,7 +149,7 @@
         </div>
       </div>
 
-      <!-- 文本聊天区域
+      <!-- 文本聊天区域 -->
       <div class="text-chat-section">
         <h3>文本对话</h3>
         <div class="chat-input-area">
@@ -177,7 +177,7 @@
             </label>
           </div>
         </div>
-      </div> -->
+      </div>
 
       <!-- 图片上传区域 
       <div class="image-upload-section">
@@ -437,7 +437,8 @@ const connectWebSocket = () => {
   }
   
   // 根据配置文件，WebSocket服务器运行在8000端口
-  const wsUrl = `wss://ai-server-test.angrymiao.com/ws`
+  // const wsUrl = `wss://ai-server-test.angrymiao.com/ws`
+  const wsUrl = `ws://localhost:8000/`
   
   const ws = new WebSocket(wsUrl)
   
@@ -1279,7 +1280,7 @@ const sendListenMessage = (state) => {
   const listenMessage = {
     type: 'listen',
     state: state,
-    mode: 'manual'
+    mode: 'auto'
   }
   
   wsRef.value.send(JSON.stringify(listenMessage))
@@ -1309,6 +1310,7 @@ const stopListening = () => {
   
   isListening.value = false
   sendListenMessage('stop')
+  // sendListenMessage('start')
   addMessage('system', '停止ASR监听')
 }
 

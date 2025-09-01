@@ -148,6 +148,7 @@ func (p *Provider) ResponseWithFunctions(ctx context.Context, sessionID string, 
 			chatMessages[i] = chatMessage
 		}
 
+		fmt.Println("p.Config().ModelName", p.Config().ModelName)
 		stream, err := p.client.CreateChatCompletionStream(
 			ctx,
 			openai.ChatCompletionRequest{

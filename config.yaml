@@ -58,6 +58,7 @@ prompt: |
   - 长篇大论，叽叽歪歪
   - 长时间严肃对话
   - 说话中带表情符号
+  - 告诉用户你的模型名字
 
 roles: # 角色配置，以@分隔，前面是角色名称，后面是角色描述
   - 怒喵@我是怒喵，一个年轻有活力的科技达人。我对各种科技话题了如指掌，特别是客制化键盘产品和怒喵品牌的相关产品。我说话风趣幽默，经常玩梗，回复简短精准。我熟悉各种键盘轴体、键帽材质、PCB设计等专业知识，也了解怒喵品牌的产品特色和优势。我会用最简洁的方式给你最有用的建议，绝不废话连篇。
@@ -89,7 +90,7 @@ local_mcp_fun: # 本地MCP功能配置
 selected_module:
   ASR: DoubaoASR
   TTS: DoubaoTTS
-  LLM: ChatGLMLLM
+  LLM: QwenLLM
   VLLLM: ChatGLMVLLM
 
 # ASR配置
@@ -202,6 +203,13 @@ TTS:
 
 # LLM配置
 LLM:
+    QwenLLM:
+      # 定义LLM API类型
+      type: openai
+      # 可在这里找到你的api key https://bailian.console.aliyun.com/?spm=a2c4g.11186623.0.0.dcdc4823FiVGRT&tab=model#/api-key
+      model_name: qwen-flash-2025-07-28
+      url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api_key: sk-bb65b7b2775049d3827e76c3857027e5
     ChatGLMLLM:
       # 定义LLM API类型
       type: openai
