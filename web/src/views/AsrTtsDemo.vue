@@ -116,24 +116,9 @@
               <button @click="stopAudio" :disabled="!currentAudio" class="stop-btn">
                 ⏹️ 停止
               </button>
-              <button @click="testAudioPlayback" class="test-btn">
-                🔊 测试音频
+              <button @click="replayAudio" :disabled="!hasLastAudio" class="replay-btn">
+                🔄 重播
               </button>
-            </div>
-            
-            <!-- 音量控制 -->
-            <div class="volume-control">
-              <label>音量:</label>
-              <input 
-                type="range" 
-                min="0" 
-                max="1" 
-                step="0.1" 
-                :value="currentAudio ? currentAudio.volume : 0.8"
-                @input="setAudioVolume($event.target.value)"
-                class="volume-slider"
-              />
-              <span class="volume-value">{{ Math.round((currentAudio ? currentAudio.volume : 0.8) * 100) }}%</span>
             </div>
             
             <!-- 播放状态显示 -->
@@ -395,6 +380,10 @@ const isAudioPlaying = ref(false)
 const audioChunks = ref([])
 const currentAudio = ref(null)
 const audioChunksCount = ref(0)
+
+// 重播功能相关
+const hasLastAudio = ref(false)
+const lastAudioChunks = ref([])
 
 // PCM播放器实例
 const pcmPlayer = ref(null)
@@ -704,68 +693,37 @@ const handleAudioData = async (data) => {
 const audioQueue = ref([])
 const isProcessingQueue = ref(false)
 
-/**
- * 生成测试音频数据（440Hz正弦波）
- */
-const generateTestAudio = () => {
-  const sampleRate = 24000
-  const duration = 1 // 1秒
-  const frequency = 440 // A4音符
-  const samples = sampleRate * duration
-  
-  const pcmData = new Uint8Array(samples * 2) // 16位PCM，每个样本2字节
-  
-  for (let i = 0; i < samples; i++) {
-    const sample = Math.sin(2 * Math.PI * frequency * i / sampleRate) * 0.3 // 30%音量
-    const intSample = Math.round(sample * 32767) // 转换为16位整数
-    
-    // 小端序存储
-    pcmData[i * 2] = intSample & 0xFF // 低字节
-    pcmData[i * 2 + 1] = (intSample >> 8) & 0xFF // 高字节
-  }
-  
-  return pcmData
-}
+
 
 /**
- * 测试音频播放
+ * 重播最后一次的TTS音频
  */
-/**
- * 测试PCM音频播放
- * 使用PCMPlayer直接播放生成的测试PCM数据
- */
-const testAudioPlayback = async () => {
+const replayAudio = async () => {
   try {
-    console.log('生成测试PCM音频...')
-    
-    // 检查PCMPlayer是否已初始化
-    if (!pcmPlayer.value) {
-      console.error('PCM播放器未初始化，无法测试')
-      addMessage('error', 'PCM播放器未初始化，无法测试')
+    if (!hasLastAudio.value || lastAudioChunks.value.length === 0) {
+      console.warn('没有可重播的音频')
+      addMessage('warning', '没有可重播的音频')
       return
     }
     
-    const testPcmData = generateTestAudio()
+    console.log('开始重播音频，音频块数量:', lastAudioChunks.value.length)
+    addMessage('system', '开始重播音频')
     
-    console.log('测试PCM数据大小:', testPcmData.length, '字节')
-    console.log('测试PCM数据前16字节:', Array.from(testPcmData.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' '))
-    addMessage('debug', `测试PCM音频生成完成: ${testPcmData.length} 字节`)
+    // 停止当前播放的音频
+    if (isAudioPlaying.value) {
+      stopAudio()
+    }
     
-    // 使用PCMPlayer直接播放PCM数据
-    console.log('使用PCMPlayer播放测试音频...')
-    pcmPlayer.value.feed(testPcmData.buffer)
-    
-    // 更新播放状态
-    isAudioPlaying.value = true
-    ttsStatus.value = 'playing'
+    // 使用保存的音频数据重播
+    audioChunks.value = [...lastAudioChunks.value]
     hasAudio.value = true
     
-    console.log('测试PCM音频播放开始')
-    addMessage('success', '测试PCM音频播放开始')
+    // 播放音频
+    await createAndPlayAudio()
     
   } catch (error) {
-    console.error('测试音频播放失败:', error)
-    addMessage('error', `测试音频播放失败: ${error?.message || '未知错误'}`)
+    console.error('重播音频失败:', error)
+    addMessage('error', `重播音频失败: ${error?.message || '未知错误'}`)
     ttsStatus.value = 'error'
   }
 }
@@ -1280,7 +1238,7 @@ const sendListenMessage = (state) => {
   const listenMessage = {
     type: 'listen',
     state: state,
-    mode: 'auto'
+    mode: 'manual'
   }
   
   wsRef.value.send(JSON.stringify(listenMessage))
@@ -1655,6 +1613,10 @@ const playCurrentSentence = async () => {
     
     console.log('播放当前句子，音频块数量:', audioChunks.value.length)
     
+    // 保存当前音频数据以供重播使用
+    lastAudioChunks.value = [...audioChunks.value]
+    hasLastAudio.value = true
+    
     // 创建当前句子的音频
     await createAndPlayAudio()
     
@@ -1751,8 +1713,7 @@ const createAndPlayAudio = async () => {
       console.log('WAV音频暂停')
     }
     
-    // 设置音量和其他属性
-    audio.volume = 0.8
+    // 设置音频属性
     audio.preload = 'auto'
     
     currentAudio.value = audio
@@ -1935,15 +1896,7 @@ const toggleAudio = () => {
   }
 }
 
-/**
- * 设置音频音量
- */
-const setAudioVolume = (volume) => {
-  if (currentAudio.value) {
-    currentAudio.value.volume = Math.max(0, Math.min(1, volume))
-    console.log('音频音量设置为:', currentAudio.value.volume)
-  }
-}
+
 
 /**
  * 获取音频播放进度
@@ -1988,6 +1941,9 @@ const clearHistory = () => {
   audioChunks.value = []
   hasAudio.value = false
   audioChunksCount.value = 0
+  // 清空重播相关数据
+  lastAudioChunks.value = []
+  hasLastAudio.value = false
   console.log('历史记录已清空')
 }
 
@@ -2417,6 +2373,15 @@ onUnmounted(() => {
   background-color: #c82333 !important;
 }
 
+.replay-btn {
+  background-color: #6f42c1 !important;
+  border-color: #6f42c1 !important;
+}
+
+.replay-btn:hover:not(:disabled) {
+  background-color: #5a32a3 !important;
+}
+
 .audio-player button:hover:not(:disabled) {
   background-color: #0056b3;
   transform: translateY(-1px);
@@ -2427,53 +2392,6 @@ onUnmounted(() => {
   border-color: #6c757d;
   cursor: not-allowed;
   opacity: 0.6;
-}
-
-.volume-control {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.volume-control label {
-  font-size: 14px;
-  color: #495057;
-  min-width: 40px;
-}
-
-.volume-slider {
-  flex: 1;
-  max-width: 150px;
-  height: 6px;
-  background: #dee2e6;
-  border-radius: 3px;
-  outline: none;
-  cursor: pointer;
-}
-
-.volume-slider::-webkit-slider-thumb {
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  background: #007bff;
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-.volume-slider::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  background: #007bff;
-  border-radius: 50%;
-  cursor: pointer;
-  border: none;
-}
-
-.volume-value {
-  font-size: 12px;
-  color: #6c757d;
-  min-width: 35px;
-  text-align: right;
 }
 
 .audio-status {

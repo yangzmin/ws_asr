@@ -219,6 +219,10 @@ func StartHttpServer(config *configs.Config, logger *utils.Logger, g *errgroup.G
 		return nil, err
 	}
 
+	// 注册ASR文档路由
+	RegisterASRDocsRoutes(apiGroup)
+	logger.Info("ASR文档服务已注册，访问地址: /api/asr/docs")
+
 	// HTTP Server（支持优雅关机）
 	httpServer := &http.Server{
 		Addr:    ":" + strconv.Itoa(config.Web.Port),
