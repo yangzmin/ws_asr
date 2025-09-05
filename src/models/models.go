@@ -2,6 +2,8 @@ package models
 
 import (
 	//"gorm.io/gorm"
+	"time"
+
 	"gorm.io/datatypes"
 )
 
@@ -53,4 +55,14 @@ type ModuleConfig struct {
 type ServerConfig struct {
 	ID     uint   `gorm:"primaryKey"`
 	CfgStr string `gorm:"type:text"`
+}
+
+type DeviceBind struct {
+	ID       uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	DeviceID string    `gorm:"type:varchar(64);not null;uniqueIndex:uniq_device_binding" json:"device_id"`
+	UserID   uint      `gorm:"not null;index" json:"user_id"`
+	BindKey  string    `gorm:"type:varchar(512);not null" json:"binding_key"`
+	IsActive bool      `gorm:"not null;default:true" json:"is_active"`
+	CreateAt time.Time `gorm:"not null;default:now()" json:"created_at"`
+	UpdateAt time.Time `gorm:"not null;default:now()" json:"updated_at"`
 }

@@ -6,8 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"xiaozhi-server-go/src/configs"
 	"xiaozhi-server-go/src/models"
 
+	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
@@ -93,16 +95,33 @@ func GetTxDB() *gorm.DB {
 }
 
 // InitDB 初始化数据库类型并连接
-func InitDB() (*gorm.DB, string, error) {
+func InitDB(config *configs.Config) (*gorm.DB, string, error) {
 	var (
 		db     *gorm.DB
 		err    error
 		dbType string
 	)
 
-	dbType = "sqlite"
-	path := "./config.db"
-	db, err = gorm.Open(sqlite.Open(path))
+	// 先尝试加载配置文件获取数据库配置
+	if config.DB.Dialect == "" {
+		// 如果配置加载失败或未配置数据库，使用默认SQLite
+		dbType = "sqlite"
+		path := "./config.db"
+		db, err = gorm.Open(sqlite.Open(path))
+	} else {
+		// 根据配置文件中的数据库类型进行连接
+		dbType = config.DB.Dialect
+		switch dbType {
+		case "postgres":
+			db, err = gorm.Open(postgres.Open(config.DB.DSN))
+			fmt.Println("postgres 数据库连接成功")
+		case "sqlite":
+			db, err = gorm.Open(sqlite.Open(config.DB.DSN))
+			fmt.Println("sqlite 数据库连接成功")
+		default:
+			return nil, "", fmt.Errorf("不支持的数据库类型: %s", dbType)
+		}
+	}
 
 	if err != nil {
 		return nil, "", fmt.Errorf("连接数据库失败: %w", err)
@@ -125,13 +144,31 @@ func InitDB() (*gorm.DB, string, error) {
 	return db, dbType, nil
 }
 
+// SetLogger 设置数据库日志记录器并显示数据库版本信息
 func SetLogger(logger *xiaozhi_utils.Logger) {
 	dbLogger = logger
 	DB.Logger = &DBLogger{logger: logger}
 
+	// 根据数据库类型获取版本信息
 	var version string
-	DB.Raw("SELECT sqlite_version()").Scan(&version)
-	logger.Info("SQLite 数据库连接成功，版本: %s", version)
+	var dbType string
+
+	// 通过GORM的Dialector判断数据库类型
+	dialectorName := DB.Dialector.Name()
+
+	switch dialectorName {
+	case "postgres":
+		DB.Raw("SELECT version()").Scan(&version)
+		dbType = "PostgreSQL"
+	case "sqlite":
+		DB.Raw("SELECT sqlite_version()").Scan(&version)
+		dbType = "SQLite"
+	default:
+		version = "未知版本"
+		dbType = dialectorName
+	}
+
+	logger.Info("%s 数据库连接成功，版本: %s", dbType, version)
 }
 
 // migrateTables 自动迁移模型表结构
@@ -141,6 +178,7 @@ func migrateTables(db *gorm.DB) error {
 		&models.User{},
 		&models.UserSetting{},
 		&models.ModuleConfig{},
+		&models.DeviceBind{},
 	)
 }
 

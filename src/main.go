@@ -1,6 +1,5 @@
-// @title 小智服务端 API 文档
+// @title 怒喵 API 文档
 // @version 1.0
-// @description 小智服务端，包含OTA与Vision等接口
 // @host localhost:8080
 // @BasePath /api
 package main
@@ -19,11 +18,13 @@ import (
 	"xiaozhi-server-go/src/configs/database"
 	cfg "xiaozhi-server-go/src/configs/server"
 	"xiaozhi-server-go/src/core/auth"
+	"xiaozhi-server-go/src/core/auth/casbin"
 	"xiaozhi-server-go/src/core/auth/store"
 	"xiaozhi-server-go/src/core/pool"
 	"xiaozhi-server-go/src/core/transport"
 	"xiaozhi-server-go/src/core/transport/websocket"
 	"xiaozhi-server-go/src/core/utils"
+	"xiaozhi-server-go/src/device"
 	_ "xiaozhi-server-go/src/docs"
 	"xiaozhi-server-go/src/ota"
 	"xiaozhi-server-go/src/task"
@@ -51,16 +52,17 @@ import (
 )
 
 func LoadConfigAndLogger() (*configs.Config, *utils.Logger, error) {
-	// 初始化数据库连接
-	_, _, err := database.InitDB()
-	if err != nil {
-		fmt.Println("数据库连接失败: %v", err)
-
-	}
 	// 加载配置,默认使用.config.yaml
 	config, configPath, err := configs.LoadConfig(database.GetServerConfigDB())
 	if err != nil {
 		return nil, nil, err
+	}
+
+	// 初始化数据库连接
+	_, _, err = database.InitDB(config)
+	if err != nil {
+		fmt.Println("数据库连接失败: %v", err)
+
 	}
 
 	// 初始化日志系统
@@ -72,6 +74,11 @@ func LoadConfigAndLogger() (*configs.Config, *utils.Logger, error) {
 	utils.DefaultLogger = logger
 
 	database.SetLogger(logger)
+
+	// 初始化Casbin jwt权限校验
+	if err := casbin.Init(config); err != nil {
+		logger.Error("初始化Casbin jwt失败: %v", err)
+	}
 
 	return config, logger, nil
 }
@@ -196,6 +203,15 @@ func StartHttpServer(config *configs.Config, logger *utils.Logger, g *errgroup.G
 		return nil, err
 	}
 
+	// 启动设备服务
+	deviceService := device.NewDefaultDeviceService(config, logger)
+	if deviceService != nil {
+		if err := deviceService.Start(groupCtx, router, apiGroup); err != nil {
+			logger.Error("设备服务启动失败 %v", err)
+			//return nil, err
+		}
+	}
+
 	// 启动Vision服务
 	visionService, err := vision.NewDefaultVisionService(config, logger)
 	if err != nil {
@@ -220,8 +236,8 @@ func StartHttpServer(config *configs.Config, logger *utils.Logger, g *errgroup.G
 	}
 
 	// 注册ASR文档路由
-	RegisterASRDocsRoutes(apiGroup)
-	logger.Info("ASR文档服务已注册，访问地址: /api/asr/docs")
+	// RegisterASRDocsRoutes(apiGroup)
+	// logger.Info("ASR文档服务已注册，访问地址: /api/asr/docs")
 
 	// HTTP Server（支持优雅关机）
 	httpServer := &http.Server{

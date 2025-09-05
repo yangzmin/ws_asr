@@ -1,7 +1,6 @@
 package configs
 
 import (
-	"fmt"
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -10,6 +9,31 @@ import (
 // TokenConfig Token配置
 type TokenConfig struct {
 	Token string `yaml:"token" json:"token"`
+}
+
+// CasbinConfig Casbin权限控制配置
+type CasbinConfig struct {
+	JWT JWTConfig `yaml:"jwt" json:"jwt"`
+}
+
+type JWTConfig struct {
+	Key           string `yaml:"key" json:"key"`
+	Issuer        string `yaml:"issuer" json:"issuer"`
+	PublicKeyPath string `yaml:"publicKeyPath" json:"publicKeyPath"`
+}
+
+// RedisConfig Redis配置
+type RedisConfig struct {
+	Addr     string `yaml:"addr" json:"addr"`         // Redis地址
+	Password string `yaml:"password" json:"password"` // Redis密码
+	DB       int    `yaml:"db" json:"db"`             // Redis数据库
+	Service  string `yaml:"service" json:"service"`   // Redis服务名称
+}
+
+// DBConfig 数据库配置
+type DBConfig struct {
+	Dialect string `yaml:"dialect" json:"dialect"` // 数据库类型
+	DSN     string `yaml:"dsn" json:"dsn"`         // 数据库连接字符串
 }
 
 // Config 主配置结构
@@ -29,9 +53,19 @@ type Config struct {
 		} `yaml:"auth" json:"auth"`
 	} `yaml:"server" json:"server"`
 
+	// Casbin权限控制配置
+	Casbin CasbinConfig `yaml:"casbin" json:"casbin"`
+
+	// Redis缓存配置
+	RedisCache RedisConfig `yaml:"redis_cache" json:"redis_cache"`
+
+	// 数据库配置
+	DB DBConfig `yaml:"db" json:"db"`
+
 	// 传输层配置
 	Transport struct {
 		WebSocket struct {
+			Browser bool   `json:"browser"`
 			Enabled bool   `yaml:"enabled" json:"enabled"`
 			IP      string `yaml:"ip" json:"ip"`
 			Port    int    `yaml:"port" json:"port"`
@@ -200,24 +234,24 @@ func (cfg *Config) setDefaults() {
 // 第一次从config.yaml加载，加载后存储到数据库加载
 // 如果数据库中已存在配置，则直接加载数据库中的配置
 func LoadConfig(dbi ConfigDBInterface) (*Config, string, error) {
-	bUseDatabaseCfg := false
+	// bUseDatabaseCfg := false
 	// 尝试从数据库加载配置
-	cfgStr, err := dbi.LoadServerConfig()
-	if err != nil {
-		fmt.Println("加载服务器配置失败:", err)
-		return nil, "", err
-	}
+	// cfgStr, err := dbi.LoadServerConfig()
+	// if err != nil {
+	// 	fmt.Println("加载服务器配置失败:", err)
+	// 	return nil, "", err
+	// }
 
 	config := &Config{}
 
 	path := "database:serverConfig"
-	if cfgStr != "" {
-		config.FromString(cfgStr)
-		Cfg = config
-		if bUseDatabaseCfg {
-			return Cfg, path, nil
-		}
-	}
+	// if cfgStr != "" {
+	// 	config.FromString(cfgStr)
+	// 	Cfg = config
+	// 	if bUseDatabaseCfg {
+	// 		return Cfg, path, nil
+	// 	}
+	// }
 
 	// 尝试从文件读取
 	path = ".config.yaml"
@@ -236,10 +270,10 @@ func LoadConfig(dbi ConfigDBInterface) (*Config, string, error) {
 		}
 	}
 
-	err = dbi.InitServerConfig(string(data))
-	if err != nil {
-		fmt.Println("初始化服务器配置到数据库失败:", err)
-	}
+	// err = dbi.InitServerConfig(string(data))
+	// if err != nil {
+	// 	fmt.Println("初始化服务器配置到数据库失败:", err)
+	// }
 	Cfg = config
 	return config, path, nil
 }

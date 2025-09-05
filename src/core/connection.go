@@ -170,7 +170,7 @@ func NewConnectionHandler(
 		talkRound: 0,
 
 		serverAudioFormat:        "opus", // 默认使用Opus格式
-		serverAudioSampleRate:    24000,
+		serverAudioSampleRate:    16000,
 		serverAudioChannels:      1,
 		serverAudioFrameDuration: 60,
 
@@ -307,6 +307,7 @@ func (h *ConnectionHandler) Handle(conn Connection) {
 			"client_id":  h.clientId,
 			"token":      h.config.Server.Token,
 		}
+		fmt.Println("params", params)
 		if err := h.mcpManager.BindConnection(conn, h.functionRegister, params); err != nil {
 			h.LogError(fmt.Sprintf("绑定MCP管理器连接失败: %v", err))
 			return
@@ -497,10 +498,10 @@ func (h *ConnectionHandler) handleChatMessage(ctx context.Context, text string) 
 	}
 
 	// 发送思考状态的情绪
-	if err := h.sendEmotionMessage("thinking"); err != nil {
-		h.LogError(fmt.Sprintf("发送思考状态情绪消息失败: %v", err))
-		return fmt.Errorf("发送情绪消息失败: %v", err)
-	}
+	// if err := h.sendEmotionMessage("thinking"); err != nil {
+	// 	h.LogError(fmt.Sprintf("发送思考状态情绪消息失败: %v", err))
+	// 	return fmt.Errorf("发送情绪消息失败: %v", err)
+	// }
 
 	h.LogInfo("收到聊天消息: " + text)
 

@@ -30,7 +30,7 @@ type OpusDecoderConfig struct {
 func NewOpusDecoder(config *OpusDecoderConfig) (*OpusDecoder, error) {
 	if config == nil {
 		config = &OpusDecoderConfig{
-			SampleRate:  24000, // 默认使用24kHz采样率
+			SampleRate:  16000, // 默认使用24kHz采样率
 			MaxChannels: 1,     // 默认单通道
 		}
 	}
@@ -330,7 +330,7 @@ func AudioToPCMData(audioFile string) ([][]byte, float64, error) {
 	mp3SampleRate := decoder.SampleRate()
 	//fmt.Println("AudioToPCMData 原始MP3采样率:", mp3SampleRate)
 	// 目标采样率设为24kHz
-	targetSampleRate := 24000
+	targetSampleRate := 16000
 
 	// decoder.Length() 返回解码后的PCM数据总字节数 (16-bit little-endian stereo)
 	pcmBytes := make([]byte, decoder.Length())
@@ -402,7 +402,7 @@ func AudioToOpusData(audioFile string) ([][]byte, float64, error) {
 
 	// 获取采样率 (固定使用24000Hz作为Opus编码的采样率)
 	// 如果采样率不是24000Hz，PCMSlicesToOpusData会处理重采样
-	opusSampleRate := 24000
+	opusSampleRate := 16000
 	channels := 1
 
 	if strings.HasSuffix(audioFile, ".mp3") {

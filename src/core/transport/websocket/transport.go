@@ -103,6 +103,27 @@ func (t *WebSocketTransport) GetType() string {
 
 // handleWebSocket 处理WebSocket连接
 func (t *WebSocketTransport) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	// 从URL参数中获取header信息（用于支持WebSocket连接时传递自定义header）
+	if t.config.Transport.WebSocket.Browser {
+		query := r.URL.Query()
+		if deviceId := query.Get("device-id"); deviceId != "" {
+			r.Header.Set("Device-Id", deviceId)
+		}
+		if clientId := query.Get("client-id"); clientId != "" {
+			r.Header.Set("Client-Id", clientId)
+		}
+		if sessionId := query.Get("session-id"); sessionId != "" {
+			r.Header.Set("Session-Id", sessionId)
+		}
+		if transportType := query.Get("transport-type"); transportType != "" {
+			r.Header.Set("Transport-Type", transportType)
+		}
+		if token := query.Get("token"); token != "" {
+			r.Header.Set("Authorization", "Bearer "+token)
+			r.Header.Set("Token", token)
+		}
+	}
+
 	conn, err := t.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		t.logger.Error("WebSocket升级失败: %v", err)

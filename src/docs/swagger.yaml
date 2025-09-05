@@ -48,10 +48,64 @@ definitions:
 host: localhost:8080
 info:
   contact: {}
-  description: 小智服务端，包含OTA与Vision等接口
-  title: 小智服务端 API 文档
+  title: 怒喵 API 文档
   version: "1.0"
 paths:
+  /:
+    get:
+      consumes:
+      - '*/*'
+      description: 处理WebSocket连接升级请求，建立实时双向通信连接
+      parameters:
+      - description: 设备ID，用于标识客户端设备
+        in: header
+        name: Device-Id
+        type: string
+      produces:
+      - '*/*'
+      responses:
+        "101":
+          description: Switching Protocols - WebSocket连接建立成功
+          schema:
+            type: string
+        "400":
+          description: Bad Request - WebSocket升级失败
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error - 服务器内部错误
+          schema:
+            type: string
+      summary: WebSocket连接处理
+      tags:
+      - WebSocket
+  /api/asr/docs:
+    get:
+      description: 获取ASR系统的完整处理流程文档，包括手动、自动、实时模式和消息类型说明
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: ASR流程文档HTML页面
+          schema:
+            type: string
+      summary: 获取ASR处理流程文档
+      tags:
+      - ASR
+  /api/asr/docs/json:
+    get:
+      description: 获取ASR系统的完整处理流程文档JSON格式数据
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ASR流程文档JSON数据
+          schema:
+            additionalProperties: true
+            type: object
+      summary: 获取ASR处理流程文档(JSON)
+      tags:
+      - ASR
   /ota/:
     get:
       description: 获取 OTA 服务状态和 WebSocket 地址，供设备查询

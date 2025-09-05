@@ -1,0 +1,75 @@
+package casbin
+
+import (
+	"crypto/rsa"
+	"errors"
+	"io/ioutil"
+	"time"
+
+	"xiaozhi-server-go/src/configs"
+
+	"github.com/golang-jwt/jwt/v4"
+)
+
+var (
+	verifyKey *rsa.PublicKey
+
+	issue string
+)
+
+type JWTClaims struct {
+	jwt.StandardClaims
+
+	UserID int    `json:"user_id"`
+	Role   string `json:"role,omitempty"`
+}
+
+func Init(c *configs.Config) error {
+
+	issue = c.Casbin.JWT.Issuer
+
+	verifyBytes, err := ioutil.ReadFile(c.Casbin.JWT.PublicKeyPath)
+	if err != nil {
+		return err
+	}
+
+	verifyKey, err = jwt.ParseRSAPublicKeyFromPEM(verifyBytes)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ParseToken 解析JWT
+func ParseToken(tokenString string) (*JWTClaims, error) {
+	// 解析token
+	token, err := jwt.ParseWithClaims(
+		tokenString,
+		&JWTClaims{},
+		func(token *jwt.Token) (i interface{}, err error) {
+			return verifyKey, nil
+		})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if claims, ok := token.Claims.(*JWTClaims); ok && token.Valid {
+		if isExpire(claims.ExpiresAt) {
+			return nil, errors.New("token expired")
+		}
+
+		if claims.Issuer != issue {
+			return nil, errors.New("token issuer not match")
+		}
+
+		return claims, nil
+	}
+
+	return nil, err
+}
+
+func isExpire(expire int64) bool {
+	return expire-time.Now().Unix() < 0
+}
