@@ -40,8 +40,8 @@ redis_cache:
 
 db:
   dialect: "postgres"
-  dsn: "host=localhost user=angrymiao password=123456 dbname=angrymiao-ai port=5432 sslmode=disable TimeZone=Asia/Shanghai"
-  # dsn: "host=pgm-wz9u4q8hdex50g417o.pg.rds.aliyuncs.com port=1921 user=angrymiao password=Y4DGtRUs7RQnto07 dbname=angrymiao-miao-coin sslmode=disable TimeZone=Asia/Shanghai"
+  # dsn: "host=localhost user=angrymiao password=123456 dbname=angrymiao-ai port=5432 sslmode=disable TimeZone=Asia/Shanghai"
+  dsn: "host=pgm-wz9u4q8hdex50g417o.pg.rds.aliyuncs.com port=1921 user=angrymiao password=Y4DGtRUs7RQnto07 dbname=angrymiao-miao-coin sslmode=disable TimeZone=Asia/Shanghai"
 
 # Web界面配置
 web:
