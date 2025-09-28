@@ -327,6 +327,16 @@ func convertConfig(cfg map[string]interface{}) (*Config, error) {
 		config.URL = url
 	}
 
+	// 连接头
+	if headers, ok := cfg["headers"].(map[string]interface{}); ok {
+		config.Headers = make(map[string]string)
+		for k, v := range headers {
+			if vStr, ok := v.(string); ok {
+				config.Headers[k] = vStr
+			}
+		}
+	}
+
 	return config, nil
 }
 

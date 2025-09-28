@@ -9,22 +9,24 @@ import (
 	"xiaozhi-server-go/src/core/utils"
 
 	mcpclient "github.com/mark3labs/mcp-go/client"
+	"github.com/mark3labs/mcp-go/client/transport"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/sashabaranov/go-openai"
 )
 
 // Config 定义MCP客户端配置
 type Config struct {
-	Enabled       bool     `yaml:"enabled"`
-	ServerAddress string   `yaml:"server_address"`
-	ServerPort    int      `yaml:"server_port"`
-	Namespace     string   `yaml:"namespace"`
-	NodeID        string   `yaml:"node_id"`
-	ResourceTypes []string `yaml:"resource_types"`
-	Command       string   `yaml:"command,omitempty"` // 命令行连接方式
-	Args          []string `yaml:"args,omitempty"`    // 命令行参数
-	Env           []string `yaml:"env,omitempty"`     // 环境变量
-	URL           string   `yaml:"url,omitempty"`     // SSE连接URL
+	Enabled       bool              `yaml:"enabled"`
+	ServerAddress string            `yaml:"server_address"`
+	ServerPort    int               `yaml:"server_port"`
+	Namespace     string            `yaml:"namespace"`
+	NodeID        string            `yaml:"node_id"`
+	ResourceTypes []string          `yaml:"resource_types"`
+	Command       string            `yaml:"command,omitempty"` // 命令行连接方式
+	Args          []string          `yaml:"args,omitempty"`    // 命令行参数
+	Env           []string          `yaml:"env,omitempty"`     // 环境变量
+	URL           string            `yaml:"url,omitempty"`     // SSE连接URL
+	Headers       map[string]string `yaml:"headers,omitempty"` // 连接头
 }
 
 // Client 封装MCP客户端功能
@@ -55,17 +57,45 @@ func NewClient(config *Config, logger *utils.Logger) (*Client, error) {
 
 	// 根据配置选择适当的客户端类型
 	if config.Command != "" {
-		// 使用命令行方式连接
-		stdioClient, err := mcpclient.NewStdioMCPClient(
-			config.Command,
-			config.Env,
-			config.Args...,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create stdio MCP client: %w", err)
+		if config.Command == "sse" {
+			// 使用SSE方式连接
+			options := make([]transport.ClientOption, 0)
+			if len(config.Headers) > 0 {
+				options = append(options, transport.WithHeaders(config.Headers))
+			}
+			sseClient, err := mcpclient.NewSSEMCPClient(
+				config.URL,
+				options...,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create SSE MCP client: %w", err)
+			}
+			c.client = sseClient
+			c.useStdioClient = false
+		} else {
+			// 使用命令行方式连接
+			stdioClient, err := mcpclient.NewStdioMCPClient(
+				config.Command,
+				config.Env,
+				config.Args...,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create stdio MCP client: %w", err)
+			}
+			c.stdioClient = stdioClient
+			c.useStdioClient = true
 		}
-		c.stdioClient = stdioClient
-		c.useStdioClient = true
+		// 使用命令行方式连接
+		// stdioClient, err := mcpclient.NewStdioMCPClient(
+		// 	config.Command,
+		// 	config.Env,
+		// 	config.Args...,
+		// )
+		// if err != nil {
+		// 	return nil, fmt.Errorf("failed to create stdio MCP client: %w", err)
+		// }
+		// c.stdioClient = stdioClient
+		// c.useStdioClient = true
 	} else {
 		fmt.Println("Unsupported MCP client type, only stdio client is supported")
 	}

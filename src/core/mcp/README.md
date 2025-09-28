@@ -13,15 +13,24 @@ esp32的MCP，添加自定义MCP工具需要在前端修改，默认支持4个�
 {
   "mcpServers": {
     "amap-maps": {
-      "command": "npx",
-      "args": [
-          "-y",
-          "@amap/amap-maps-mcp-server"
-      ],
-      "env": {
-          "AMAP_MAPS_API_KEY": "你的高德api key"
-      }
-    },
+            "command": "npx",
+            "args": [
+                "-y",
+                "@amap/amap-maps-mcp-server"
+            ],
+            "env": {
+                "AMAP_MAPS_API_KEY": "f254d97139f32e60930626aad16074ad"
+            }
+        },
+        "WebSearch": {
+            "command": "sse",
+            "args": [
+                "https://dashscope.aliyuncs.com/api/v1/mcps/WebSearch"
+            ],
+            "headers": {
+                "Authorization": "Bearer sk-bb65b7b2775049d3827e76c3857027e5"
+            }
+        }
     "filesystem": {
       "command": "npx",
       "args": [

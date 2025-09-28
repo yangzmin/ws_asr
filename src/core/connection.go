@@ -559,6 +559,7 @@ func (h *ConnectionHandler) genResponseByLLM(ctx context.Context, messages []pro
 	for response := range responses {
 		content := response.Content
 		toolCall := response.ToolCalls
+		fmt.Println("response", response)
 
 		if response.Error != "" {
 			h.LogError(fmt.Sprintf("LLM响应错误: %s", response.Error))
