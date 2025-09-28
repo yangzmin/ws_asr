@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"xiaozhi-server-go/src/configs"
+	"xiaozhi-server-go/src/core/auth"
 	"xiaozhi-server-go/src/core/transport"
 	"xiaozhi-server-go/src/core/utils"
 
@@ -20,6 +22,7 @@ type WebSocketTransport struct {
 	connHandler       transport.ConnectionHandlerFactory
 	activeConnections sync.Map
 	upgrader          *websocket.Upgrader
+	authToken         *auth.AuthToken // JWT认证工具
 }
 
 // NewWebSocketTransport 创建新的WebSocket传输层
@@ -32,6 +35,7 @@ func NewWebSocketTransport(config *configs.Config, logger *utils.Logger) *WebSoc
 				return true // 允许所有来源的连接
 			},
 		},
+		authToken: auth.NewAuthToken(config.Server.Token), // 初始化JWT认证工具
 	}
 }
 
@@ -101,6 +105,31 @@ func (t *WebSocketTransport) GetType() string {
 	return "websocket"
 }
 
+// verifyJWTAuth 验证JWT认证
+func (t *WebSocketTransport) verifyJWTAuth(r *http.Request) error {
+	// 获取Authorization头
+	authHeader := r.Header.Get("Authorization")
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		return fmt.Errorf("缺少或无效的Authorization头")
+	}
+
+	token := authHeader[7:] // 移除"Bearer "前缀
+
+	// 验证JWT token
+	isValid, deviceID, err := t.authToken.VerifyToken(token)
+	if err != nil || !isValid {
+		return fmt.Errorf("JWT token验证失败: %v", err)
+	}
+
+	// 检查设备ID匹配
+	requestDeviceID := r.Header.Get("Device-Id")
+	if requestDeviceID != deviceID {
+		return fmt.Errorf("设备ID与token不匹配: 请求=%s, token=%s", requestDeviceID, deviceID)
+	}
+
+	return nil
+}
+
 // handleWebSocket 处理WebSocket连接
 func (t *WebSocketTransport) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// 从URL参数中获取header信息（用于支持WebSocket连接时传递自定义header）
@@ -123,6 +152,15 @@ func (t *WebSocketTransport) handleWebSocket(w http.ResponseWriter, r *http.Requ
 			r.Header.Set("Token", token)
 		}
 	}
+
+	// 验证JWT认证
+	if err := t.verifyJWTAuth(r); err != nil {
+		t.logger.Warn("WebSocket认证失败: %v device-id: %s", err, r.Header.Get("Device-Id"))
+		http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	t.logger.Info("WebSocket认证成功: %s", r.Header.Get("Device-Id"))
 
 	conn, err := t.upgrader.Upgrade(w, r, nil)
 	if err != nil {

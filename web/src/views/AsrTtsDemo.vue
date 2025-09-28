@@ -426,7 +426,7 @@ const reconnectDelay = ref(3000) // 初始重连延迟3秒
 
 // WebSocket Header配置
 const headerConfig = reactive({
-  deviceId: 'web-client-' + Date.now(),
+  deviceId: 'web-client-12333',
   clientId: 'web-' + Math.random().toString(36).substr(2, 9),
   sessionId: '',
   transportType: 'websocket',

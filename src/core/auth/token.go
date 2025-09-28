@@ -22,9 +22,15 @@ func NewAuthToken(secretKey string) *AuthToken {
 	}
 }
 
+// GenerateToken 生成JWT token，默认1小时有效期
 func (at *AuthToken) GenerateToken(deviceID string) (string, error) {
-	// 设置过期时间为1小时后
-	expireTime := time.Now().Add(time.Hour)
+	return at.GenerateTokenWithExpiry(deviceID, time.Hour)
+}
+
+// GenerateTokenWithExpiry 生成指定有效期的JWT token
+func (at *AuthToken) GenerateTokenWithExpiry(deviceID string, expiry time.Duration) (string, error) {
+	// 设置过期时间
+	expireTime := time.Now().Add(expiry)
 
 	// 创建claims
 	claims := jwt.MapClaims{

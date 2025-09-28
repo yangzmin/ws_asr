@@ -65,6 +65,9 @@ func (c *LocalClient) RegisterTools() {
 		} else if funcName == "play_music" {
 			c.AddToolPlayMusic()
 			c.logger.Info("RegisterTools: play_music tool registered")
+		} else if funcName == "take_photo" {
+			c.AddToolTakePhoto()
+			c.logger.Info("RegisterTools: take_photo tool registered")
 		} else {
 			c.logger.Warn("RegisterTools: unknown function name %s", funcName)
 		}

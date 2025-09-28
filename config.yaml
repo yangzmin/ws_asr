@@ -102,6 +102,7 @@ local_mcp_fun: # 本地MCP功能配置
   - change_role # 切换角色
   - play_music # 播放本地音乐
   - change_voice # 切换音色
+  - take_photo # 拍照功能
 
 
 # 选择使用的模块
