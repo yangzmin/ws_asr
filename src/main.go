@@ -242,7 +242,7 @@ func StartHttpServer(config *configs.Config, logger *utils.Logger, g *errgroup.G
 	// HTTP Server（支持优雅关机）
 	httpServer := &http.Server{
 		Addr:    ":" + strconv.Itoa(config.Web.Port),
-		Handler: ginRouter,
+		Handler: router,
 	}
 
 	// 注册Swagger文档路由
