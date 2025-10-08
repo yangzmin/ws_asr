@@ -12,7 +12,7 @@ require (
 	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/mark3labs/mcp-go v0.29.0
 	github.com/qrtc/opus-go v0.0.1
-	github.com/sashabaranov/go-openai v1.40.0
+	github.com/sashabaranov/go-openai v1.41.2
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
 	github.com/swaggo/swag v1.16.4

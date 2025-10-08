@@ -537,6 +537,7 @@ func (h *ConnectionHandler) genResponseByLLM(ctx context.Context, messages []pro
 	// 使用LLM生成回复
 	tools := h.functionRegister.GetAllFunctions()
 	fmt.Println("GetAllFunctions", tools)
+	fmt.Println("messagesmessages", messages)
 	responses, err := h.providers.llm.ResponseWithFunctions(ctx, h.sessionID, messages, tools)
 	if err != nil {
 		return fmt.Errorf("LLM生成回复失败: %v", err)
