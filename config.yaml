@@ -108,7 +108,7 @@ local_mcp_fun: # 本地MCP功能配置
 # 选择使用的模块
 selected_module:
   ASR: DoubaoASR
-  # TTS: DoubaoTTS
+  TTS: DoubaoTTS
   LLM: QwenLLM
   VLLLM: ChatGLMVLLM
 
@@ -257,54 +257,6 @@ LLM:
       personal_access_token: 你的coze个人令牌
       url: "https://api.coze.cn" # Coze服务地址
 
-    RouterLLM:
-      type: RouterLLM
-      router_config:
-        # 路由器LLM（用于意图识别）
-        router:
-          type: openai
-          model_name: qwen-flash-2025-07-28
-          url: https://dashscope.aliyuncs.com/compatible-mode/v1
-          api_key: sk-bb65b7b2775049d3827e76c3857027e5
-          temperature: 0.1
-          max_tokens: 500
-        
-        # 专用LLM配置
-        specialized_llms:
-          internet_llm:
-            type: openai
-            model_name: qwen-flash-2025-07-28
-            url: https://dashscope.aliyuncs.com/compatible-mode/v1
-            api_key: sk-bb65b7b2775049d3827e76c3857027e5
-            temperature: 0.3
-            max_tokens: 2000
-          
-          code_llm:
-            type: openai
-            model_name: glm-4-flash
-            url: https://open.bigmodel.cn/api/paas/v4/
-            api_key: 75cd6a6a64c64acab762fe8a3f571bd2.avQ3LKXmKVjj1v8F
-            temperature: 0.1
-            max_tokens: 4000
-          
-          general_llm:
-            type: openai
-            model_name: qwen-flash-2025-07-28
-            url: https://dashscope.aliyuncs.com/compatible-mode/v1
-            api_key: sk-bb65b7b2775049d3827e76c3857027e5
-            temperature: 0.7
-            max_tokens: 2000
-        
-        # 路由策略配置
-        routing_strategy:
-          default_strategy: "keyword_matching"
-          fallback_llm: "general_llm"
-          load_balancing:
-            enabled: true
-            algorithm: "round_robin"
-          intent_classification:
-            enabled: true
-            confidence_threshold: 0.8
 
 # 退出指令
 CMD_exit:
@@ -364,51 +316,6 @@ VLLLM:
       enable_deep_scan: true
       validation_timeout: 10s
 
-# LLM路由配置
-llm_router:
-  # 是否启用LLM路由功能
-  enabled: true
-  # 系统默认LLM配置（不可用户修改）
-  system_default_llms:
-    # 路由识别LLM - 用于分析用户意图和路由决策
-    router_llm: "QwenLLM"
-    # 默认处理LLM - 当没有匹配的路由规则时使用
-    default_llm: "QwenLLM"
-  # 路由策略配置
-  routing_strategies:
-    # 关键词匹配策略
-    keyword_matching:
-      enabled: true
-      priority: 1
-    # 意图分类策略
-    intent_classification:
-      enabled: true
-      priority: 2
-      confidence_threshold: 0.7
-    # 负载均衡策略
-    load_balancing:
-      enabled: true
-      priority: 3
-    # 默认策略
-    default_strategy:
-      enabled: true
-      priority: 4
-  # 缓存配置
-  cache:
-    enabled: true
-    ttl_seconds: 3600  # 1小时
-    max_entries: 10000
-  # 预定义关键词规则
-  keyword_rules:
-    - keywords: ["编程", "代码", "开发", "程序", "算法"]
-      target_llm: "ChatGLMLLM"
-      description: "编程相关问题"
-    - keywords: ["翻译", "英语", "中文", "语言"]
-      target_llm: "QwenLLM"
-      description: "语言翻译相关"
-    - keywords: ["创作", "写作", "文章", "故事"]
-      target_llm: "ChatGLMLLM"
-      description: "创意写作相关"
 
 # 连接池配置
 pool_config:
