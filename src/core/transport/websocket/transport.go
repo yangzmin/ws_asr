@@ -105,29 +105,31 @@ func (t *WebSocketTransport) GetType() string {
 	return "websocket"
 }
 
-// verifyJWTAuth 验证JWT认证
-func (t *WebSocketTransport) verifyJWTAuth(r *http.Request) error {
+// verifyJWTAuth 验证JWT认证并返回用户ID
+func (t *WebSocketTransport) verifyJWTAuth(r *http.Request) (uint, error) {
 	// 获取Authorization头
 	authHeader := r.Header.Get("Authorization")
 	if !strings.HasPrefix(authHeader, "Bearer ") {
-		return fmt.Errorf("缺少或无效的Authorization头")
+		return 0, fmt.Errorf("缺少或无效的Authorization头")
 	}
 
 	token := authHeader[7:] // 移除"Bearer "前缀
 
 	// 验证JWT token
-	isValid, deviceID, err := t.authToken.VerifyToken(token)
+	isValid, deviceID, userID, err := t.authToken.VerifyToken(token)
 	if err != nil || !isValid {
-		return fmt.Errorf("JWT token验证失败: %v", err)
+		return 0, fmt.Errorf("JWT token验证失败: %v", err)
 	}
 
 	// 检查设备ID匹配
 	requestDeviceID := r.Header.Get("Device-Id")
 	if requestDeviceID != deviceID {
-		return fmt.Errorf("设备ID与token不匹配: 请求=%s, token=%s", requestDeviceID, deviceID)
+		return 0, fmt.Errorf("设备ID与token不匹配: 请求=%s, token=%s", requestDeviceID, deviceID)
 	}
 
-	return nil
+	t.logger.Info("用户认证成功: userID=%d, deviceID=%s", userID, deviceID)
+
+	return userID, nil
 }
 
 // handleWebSocket 处理WebSocket连接
@@ -153,14 +155,17 @@ func (t *WebSocketTransport) handleWebSocket(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	// 验证JWT认证
-	if err := t.verifyJWTAuth(r); err != nil {
+	// 验证JWT认证并获取用户ID
+	userID, err := t.verifyJWTAuth(r)
+	if err != nil {
 		t.logger.Warn("WebSocket认证失败: %v device-id: %s", err, r.Header.Get("Device-Id"))
 		http.Error(w, "Unauthorized: "+err.Error(), http.StatusUnauthorized)
 		return
 	}
 
-	t.logger.Info("WebSocket认证成功: %s", r.Header.Get("Device-Id"))
+	// 将用户ID添加到请求头中，供连接处理器使用
+	r.Header.Set("User-Id", fmt.Sprintf("%d", userID))
+	t.logger.Info("WebSocket认证成功: device-id=%s, user-id=%d", r.Header.Get("Device-Id"), userID)
 
 	conn, err := t.upgrader.Upgrade(w, r, nil)
 	if err != nil {

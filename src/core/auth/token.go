@@ -24,16 +24,17 @@ func NewAuthToken(secretKey string) *AuthToken {
 
 // GenerateToken 生成JWT token，默认1小时有效期
 func (at *AuthToken) GenerateToken(deviceID string) (string, error) {
-	return at.GenerateTokenWithExpiry(deviceID, time.Hour)
+	return at.GenerateTokenWithExpiry(0, deviceID, time.Hour)
 }
 
 // GenerateTokenWithExpiry 生成指定有效期的JWT token
-func (at *AuthToken) GenerateTokenWithExpiry(deviceID string, expiry time.Duration) (string, error) {
+func (at *AuthToken) GenerateTokenWithExpiry(userID uint, deviceID string, expiry time.Duration) (string, error) {
 	// 设置过期时间
 	expireTime := time.Now().Add(expiry)
 
 	// 创建claims
 	claims := jwt.MapClaims{
+		"user_id":   userID,
 		"device_id": deviceID,
 		"exp":       expireTime.Unix(),
 		"iat":       time.Now().Unix(), // 添加签发时间
@@ -51,13 +52,13 @@ func (at *AuthToken) GenerateTokenWithExpiry(deviceID string, expiry time.Durati
 	return tokenString, nil
 }
 
-func (at *AuthToken) VerifyToken(tokenString string) (bool, string, error) {
+func (at *AuthToken) VerifyToken(tokenString string) (bool, string, uint, error) {
 	if at == nil {
-		return false, "", errors.New("AuthToken instance is nil")
+		return false, "", 0, errors.New("AuthToken instance is nil")
 	}
 
 	if at.secretKey == nil {
-		return false, "", errors.New("secret key is not initialized")
+		return false, "", 0, errors.New("secret key is not initialized")
 	}
 
 	// 解析token
@@ -69,25 +70,30 @@ func (at *AuthToken) VerifyToken(tokenString string) (bool, string, error) {
 		return at.secretKey, nil
 	})
 	if err != nil {
-		return false, "", fmt.Errorf("failed to parse token: %w", err)
+		return false, "", 0, fmt.Errorf("failed to parse token: %w", err)
 	}
 
 	// 验证token是否有效
 	if !token.Valid {
-		return false, "", errors.New("invalid token")
+		return false, "", 0, errors.New("invalid token")
 	}
 
 	// 获取claims
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return false, "", errors.New("invalid claims")
+		return false, "", 0, errors.New("invalid claims")
 	}
 
 	// 获取设备ID
 	deviceID, ok := claims["device_id"].(string)
 	if !ok {
-		return false, "", errors.New("invalid device_id in claims")
+		return false, "", 0, errors.New("invalid device_id in claims")
+	}
+	// 获取userID
+	userID, ok := claims["user_id"].(float64)
+	if !ok {
+		return false, "", 0, errors.New("invalid user_id in claims")
 	}
 
-	return true, deviceID, nil
+	return true, deviceID, uint(userID), nil
 }

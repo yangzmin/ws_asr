@@ -63,6 +63,6 @@ type DeviceBind struct {
 	UserID   uint      `gorm:"not null;index" json:"user_id"`
 	BindKey  string    `gorm:"type:varchar(512);not null" json:"binding_key"`
 	IsActive bool      `gorm:"not null;default:true" json:"is_active"`
-	CreateAt time.Time `gorm:"not null;default:now()" json:"created_at"`
-	UpdateAt time.Time `gorm:"not null;default:now()" json:"updated_at"`
+	CreateAt time.Time `gorm:"not null;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdateAt time.Time `gorm:"not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
 }

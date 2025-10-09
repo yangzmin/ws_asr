@@ -119,7 +119,7 @@ func (s *DefaultDeviceService) handleDeviceBind(c *gin.Context) {
 
 	// 生成7天有效期的token
 	sevenDays := 7 * 24 * time.Hour
-	deviceToken, err := s.authToken.GenerateTokenWithExpiry(body.DeviceID, sevenDays)
+	deviceToken, err := s.authToken.GenerateTokenWithExpiry(userID, body.DeviceID, sevenDays)
 	if err != nil {
 		s.logger.Error("生成设备token失败: %v", err)
 		s.respondError(c, http.StatusInternalServerError, "生成设备token失败")

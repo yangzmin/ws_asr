@@ -203,7 +203,7 @@ func (s *DefaultVisionService) verifyAuth(c *gin.Context) (*AuthVerifyResult, er
 	s.logger.Debug(fmt.Sprintf("收到认证token: %s", token))
 
 	// 验证token（注意VerifyToken返回3个值）
-	isValid, deviceID, err := s.authToken.VerifyToken(token)
+	isValid, deviceID, _, err := s.authToken.VerifyToken(token)
 	if err != nil || !isValid {
 		s.logger.Warn(fmt.Sprintf("认证token验证失败: %v", err))
 		return nil, fmt.Errorf("无效的认证token或token已过期")
