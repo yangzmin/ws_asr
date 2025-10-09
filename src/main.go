@@ -26,12 +26,15 @@ import (
 	"xiaozhi-server-go/src/core/utils"
 	"xiaozhi-server-go/src/device"
 	_ "xiaozhi-server-go/src/docs"
+	"xiaozhi-server-go/src/handlers"
 	"xiaozhi-server-go/src/ota"
+	"xiaozhi-server-go/src/services"
 	"xiaozhi-server-go/src/task"
 	"xiaozhi-server-go/src/vision"
 
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	"gorm.io/gorm"
 
 	// 导入所有providers以确保init函数被调用
 	_ "xiaozhi-server-go/src/core/providers/asr/deepgram"
@@ -58,13 +61,6 @@ func LoadConfigAndLogger() (*configs.Config, *utils.Logger, error) {
 		return nil, nil, err
 	}
 
-	// 初始化数据库连接
-	_, _, err = database.InitDB(config)
-	if err != nil {
-		fmt.Println("数据库连接失败: %v", err)
-
-	}
-
 	// 初始化日志系统
 	logger, err := utils.NewLogger((*utils.LogCfg)(&config.Log))
 	if err != nil {
@@ -72,8 +68,6 @@ func LoadConfigAndLogger() (*configs.Config, *utils.Logger, error) {
 	}
 	logger.Info("日志系统初始化成功, 配置文件路径: %s", configPath)
 	utils.DefaultLogger = logger
-
-	database.SetLogger(logger)
 
 	// 初始化Casbin jwt权限校验
 	if err := casbin.Init(config); err != nil {
@@ -112,6 +106,7 @@ func StartTransportServer(
 	authManager *auth.AuthManager,
 	g *errgroup.Group,
 	groupCtx context.Context,
+	db *gorm.DB,
 ) (*transport.TransportManager, error) {
 	// 初始化资源池管理器
 	poolManager, err := pool.NewPoolManager(config, logger)
@@ -127,6 +122,8 @@ func StartTransportServer(
 	})
 	taskMgr.Start()
 
+	userConfigService := services.NewUserAIConfigService(db, logger)
+
 	// 创建传输管理器
 	transportManager := transport.NewTransportManager(config, logger)
 
@@ -136,6 +133,7 @@ func StartTransportServer(
 		poolManager,
 		taskMgr,
 		logger,
+		userConfigService,
 	)
 
 	// 根据配置启用不同的传输层
@@ -143,7 +141,7 @@ func StartTransportServer(
 
 	// 检查WebSocket传输层配置
 	if config.Transport.WebSocket.Enabled {
-		wsTransport := websocket.NewWebSocketTransport(config, logger)
+		wsTransport := websocket.NewWebSocketTransport(config, logger, userConfigService)
 		wsTransport.SetConnectionHandler(handlerFactory)
 		transportManager.RegisterTransport("websocket", wsTransport)
 		enabledTransports = append(enabledTransports, "WebSocket")
@@ -185,6 +183,9 @@ func StartTransportServer(
 }
 
 func StartHttpServer(config *configs.Config, logger *utils.Logger, g *errgroup.Group, groupCtx context.Context) (*http.Server, error) {
+	// 获取数据库连接
+	db := database.GetDB()
+
 	// 初始化Gin引擎
 	if config.Log.LogLevel == "debug" {
 		gin.SetMode(gin.DebugMode)
@@ -234,6 +235,11 @@ func StartHttpServer(config *configs.Config, logger *utils.Logger, g *errgroup.G
 		logger.Error("配置服务启动失败", err)
 		return nil, err
 	}
+
+	// 启动AI配置管理服务
+	aiConfigHandler := handlers.NewAIConfigHandler(db, logger)
+	aiConfigHandler.RegisterRoutes(apiGroup)
+	logger.Info("AI配置管理服务已注册，访问地址: /api/ai-configs")
 
 	// 注册ASR文档路由
 	// RegisterASRDocsRoutes(apiGroup)
@@ -316,9 +322,10 @@ func startServices(
 	authManager *auth.AuthManager,
 	g *errgroup.Group,
 	groupCtx context.Context,
+	db *gorm.DB,
 ) error {
 	// 启动传输层服务
-	if _, err := StartTransportServer(config, logger, authManager, g, groupCtx); err != nil {
+	if _, err := StartTransportServer(config, logger, authManager, g, groupCtx, db); err != nil {
 		return fmt.Errorf("启动传输层服务失败: %w", err)
 	}
 
@@ -338,6 +345,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	// 初始化数据库连接
+	db, _, err := database.InitDB(config)
+	if err != nil {
+		fmt.Println("数据库连接失败: %v", err)
+
+	}
+
+	database.SetLogger(logger)
+
 	// 初始化认证管理器
 	authManager, err := initAuthManager(config, logger)
 	if err != nil {
@@ -353,7 +369,7 @@ func main() {
 	g, groupCtx := errgroup.WithContext(ctx)
 
 	// 启动所有服务
-	if err := startServices(config, logger, authManager, g, groupCtx); err != nil {
+	if err := startServices(config, logger, authManager, g, groupCtx, db); err != nil {
 		logger.Error("启动服务失败:%v", err)
 		cancel()
 		os.Exit(1)

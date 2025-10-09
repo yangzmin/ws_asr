@@ -6,10 +6,13 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+
 	"xiaozhi-server-go/src/configs"
 	"xiaozhi-server-go/src/core/auth"
 	"xiaozhi-server-go/src/core/transport"
 	"xiaozhi-server-go/src/core/utils"
+	"xiaozhi-server-go/src/models"
+	"xiaozhi-server-go/src/services"
 
 	"github.com/gorilla/websocket"
 )
@@ -23,19 +26,21 @@ type WebSocketTransport struct {
 	activeConnections sync.Map
 	upgrader          *websocket.Upgrader
 	authToken         *auth.AuthToken // JWT认证工具
+	userConfigService services.UserAIConfigService
 }
 
-// NewWebSocketTransport 创建新的WebSocket传输层
-func NewWebSocketTransport(config *configs.Config, logger *utils.Logger) *WebSocketTransport {
+// NewWebSocketTransport 创建WebSocket传输层
+func NewWebSocketTransport(config *configs.Config, logger *utils.Logger, userConfigService services.UserAIConfigService) *WebSocketTransport {
 	return &WebSocketTransport{
 		config: config,
 		logger: logger,
 		upgrader: &websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
-				return true // 允许所有来源的连接
+				return true // 允许所有来源，生产环境应该更严格
 			},
 		},
-		authToken: auth.NewAuthToken(config.Server.Token), // 初始化JWT认证工具
+		authToken:         auth.NewAuthToken(config.Server.Token), // 初始化JWT认证工具
+		userConfigService: userConfigService,
 	}
 }
 
@@ -167,6 +172,19 @@ func (t *WebSocketTransport) handleWebSocket(w http.ResponseWriter, r *http.Requ
 	r.Header.Set("User-Id", fmt.Sprintf("%d", userID))
 	t.logger.Info("WebSocket认证成功: device-id=%s, user-id=%d", r.Header.Get("Device-Id"), userID)
 
+	// 预加载用户配置，避免在ConnectionHandler中重复查询数据库
+	userConfigs, err := t.preloadUserConfigs(fmt.Sprintf("%d", userID))
+	if err != nil {
+		t.logger.Warn("预加载用户配置失败: %v", err)
+		// 不阻断连接，继续处理
+	} else {
+		t.logger.Info("成功预加载用户 %d 的配置，共 %d 个", userID, len(userConfigs))
+	}
+
+	// 将用户配置存储到请求上下文中
+	ctx := context.WithValue(r.Context(), "user_configs", userConfigs)
+	r = r.WithContext(ctx)
+
 	conn, err := t.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		t.logger.Error("WebSocket升级失败: %v", err)
@@ -203,4 +221,15 @@ func (t *WebSocketTransport) handleWebSocket(w http.ResponseWriter, r *http.Requ
 
 		handler.Handle()
 	}()
+}
+
+// preloadUserConfigs 预加载用户配置
+func (t *WebSocketTransport) preloadUserConfigs(userID string) ([]*models.UserAIConfig, error) {
+	// 获取用户的活跃Function Call配置
+	configs, err := t.userConfigService.GetActiveConfigs(context.Background(), userID, "function_call")
+	if err != nil {
+		return nil, fmt.Errorf("获取用户配置失败: %v", err)
+	}
+
+	return configs, nil
 }

@@ -179,6 +179,8 @@ func migrateTables(db *gorm.DB) error {
 		&models.UserSetting{},
 		&models.ModuleConfig{},
 		&models.DeviceBind{},
+		&models.UserAIConfig{},
+		&models.UserSessionConfig{},
 	)
 }
 

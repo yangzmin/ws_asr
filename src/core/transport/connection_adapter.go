@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"net/http"
 	"sync/atomic"
+
 	"xiaozhi-server-go/src/configs"
 	"xiaozhi-server-go/src/core"
 	"xiaozhi-server-go/src/core/pool"
 	"xiaozhi-server-go/src/core/utils"
+	"xiaozhi-server-go/src/services"
 	"xiaozhi-server-go/src/task"
 )
 
@@ -34,6 +36,7 @@ func NewConnectionContextAdapter(
 	taskMgr *task.TaskManager,
 	logger *utils.Logger,
 	req *http.Request,
+	userConfigService services.UserAIConfigService,
 ) *ConnectionContextAdapter {
 	clientID := conn.GetID()
 	connCtx, connCancel := context.WithCancel(context.Background())
@@ -145,10 +148,11 @@ func (a *ConnectionContextAdapter) CreateSafeCallback() func(func(*core.Connecti
 
 // DefaultConnectionHandlerFactory 默认连接处理器工厂
 type DefaultConnectionHandlerFactory struct {
-	config      *configs.Config
-	poolManager *pool.PoolManager
-	taskMgr     *task.TaskManager
-	logger      *utils.Logger
+	config            *configs.Config
+	poolManager       *pool.PoolManager
+	taskMgr           *task.TaskManager
+	logger            *utils.Logger
+	userConfigService services.UserAIConfigService
 }
 
 // NewDefaultConnectionHandlerFactory 创建默认连接处理器工厂
@@ -157,12 +161,14 @@ func NewDefaultConnectionHandlerFactory(
 	poolManager *pool.PoolManager,
 	taskMgr *task.TaskManager,
 	logger *utils.Logger,
+	userConfigService services.UserAIConfigService,
 ) *DefaultConnectionHandlerFactory {
 	return &DefaultConnectionHandlerFactory{
-		config:      config,
-		poolManager: poolManager,
-		taskMgr:     taskMgr,
-		logger:      logger,
+		config:            config,
+		poolManager:       poolManager,
+		taskMgr:           taskMgr,
+		logger:            logger,
+		userConfigService: userConfigService,
 	}
 }
 
@@ -187,6 +193,7 @@ func (f *DefaultConnectionHandlerFactory) CreateHandler(
 		f.taskMgr,
 		f.logger,
 		req,
+		f.userConfigService,
 	)
 
 	return adapter

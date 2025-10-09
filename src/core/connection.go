@@ -24,9 +24,12 @@ import (
 	"xiaozhi-server-go/src/core/providers/vlllm"
 	"xiaozhi-server-go/src/core/types"
 	"xiaozhi-server-go/src/core/utils"
+	"xiaozhi-server-go/src/models"
+	"xiaozhi-server-go/src/services"
 	"xiaozhi-server-go/src/task"
 
 	"github.com/google/uuid"
+	"github.com/sashabaranov/go-openai"
 )
 
 // Connection 统一连接接口
@@ -133,6 +136,11 @@ type ConnectionHandler struct {
 	functionRegister *function.FunctionRegistry
 	mcpManager       *mcp.Manager
 
+	// 用户AI配置服务
+	userConfigService services.UserAIConfigService
+	userID            string        // 从JWT中提取的用户ID
+	request           *http.Request // HTTP请求对象，用于获取用户配置等信息
+
 	mcpResultHandlers map[string]func(interface{}) // MCP处理器映射
 	ctx               context.Context
 }
@@ -174,26 +182,27 @@ func NewConnectionHandler(
 		serverAudioChannels:      1,
 		serverAudioFrameDuration: 60,
 
-		ctx: ctx,
+		ctx:     ctx,
+		request: req, // 保存HTTP请求对象
 
 		headers: make(map[string]string),
 	}
 
 	for key, values := range req.Header {
 		if len(values) > 0 {
-			handler.headers[key] = values[0] // 取第一个值
+			handler.headers[key] = values[0]
 		}
 		if key == "Device-Id" {
-			handler.deviceID = values[0] // 设备ID
+			handler.deviceID = values[0]
 		}
 		if key == "Client-Id" {
-			handler.clientId = values[0] // 客户端ID
+			handler.clientId = values[0]
 		}
 		if key == "Session-Id" {
-			handler.sessionID = values[0] // 会话ID
+			handler.sessionID = values[0]
 		}
 		if key == "Transport-Type" {
-			handler.transportType = values[0] // 传输类型
+			handler.transportType = values[0]
 		}
 		logger.Info("HTTP头部信息: %s: %s", key, values[0])
 	}
@@ -285,6 +294,12 @@ func (h *ConnectionHandler) Handle(conn Connection) {
 	defer conn.Close()
 
 	h.conn = conn
+
+	// 在WebSocket连接建立后加载用户AI配置
+	// 此时用户已通过JWT认证，可以安全地加载用户配置
+	if h.request != nil {
+		h.loadUserAIConfigurations(h.request)
+	}
 
 	// 启动消息处理协程
 	go h.processClientAudioMessagesCoroutine() // 添加客户端音频消息处理协程
@@ -1081,4 +1096,125 @@ func (h *ConnectionHandler) genResponseByVLLM(ctx context.Context, messages []pr
 	}))
 
 	return nil
+}
+
+// extractUserIDFromRequest 从HTTP请求中提取用户ID
+func (h *ConnectionHandler) extractUserIDFromRequest(req *http.Request) (string, error) {
+	// 从Authorization头部获取JWT token
+	authHeader := req.Header.Get("Authorization")
+	if authHeader == "" {
+		return "", nil // 没有Authorization头部，返回空字符串而不是错误
+	}
+
+	// 移除"Bearer "前缀
+	token := strings.TrimPrefix(authHeader, "Bearer ")
+	if token == authHeader {
+		return "", fmt.Errorf("无效的Authorization头部格式")
+	}
+
+	// 使用auth包的VerifyToken方法验证JWT并提取用户ID
+	authToken := auth.NewAuthToken(h.config.Casbin.JWT.Key)
+
+	valid, deviceID, userID, err := authToken.VerifyToken(token)
+	if err != nil {
+		return "", fmt.Errorf("JWT验证失败: %v", err)
+	}
+	if !valid {
+		return "", fmt.Errorf("JWT无效")
+	}
+
+	h.logger.Debug("JWT验证成功，设备ID: %s, 用户ID: %d", deviceID, userID)
+	return fmt.Sprintf("%d", userID), nil
+}
+
+// loadUserAIConfigurations 加载用户AI配置并注册到functionRegister
+func (h *ConnectionHandler) loadUserAIConfigurations(req *http.Request) {
+	if h.userID == "" {
+		h.logger.Debug("用户ID为空，跳过加载用户AI配置")
+		return
+	}
+
+	// 首先尝试从请求上下文获取预加载的用户配置
+	if req != nil {
+		if preloadedConfigs := req.Context().Value("user_configs"); preloadedConfigs != nil {
+			if configs, ok := preloadedConfigs.([]*models.UserAIConfig); ok {
+				h.logger.Info("使用预加载的用户AI配置，配置数量: %d", len(configs))
+				h.registerUserConfigs(configs)
+				return
+			}
+		}
+	}
+
+	// 如果没有预加载的配置，则从数据库加载
+	h.logger.Debug("未找到预加载配置，从数据库加载用户AI配置")
+	configs, err := h.userConfigService.GetUserConfigs(context.Background(), h.userID, "function_call")
+	if err != nil {
+		h.logger.Error("加载用户AI配置失败: %v", err)
+		return
+	}
+
+	if len(configs) == 0 {
+		h.logger.Debug("用户 %s 没有自定义Function Call配置", h.userID)
+		return
+	}
+
+	h.registerUserConfigs(configs)
+}
+
+// registerUserConfigs 注册用户配置到functionRegister
+func (h *ConnectionHandler) registerUserConfigs(configs []*models.UserAIConfig) {
+	// 将用户配置转换为OpenAI工具格式并注册到functionRegister
+	for _, config := range configs {
+		if config.ConfigType == "function_call" && config.FunctionName != "" {
+			tool := h.convertConfigToOpenAITool(config)
+			if tool != nil {
+				// 注册工具到functionRegister
+				err := h.functionRegister.RegisterFunction(config.FunctionName, *tool)
+				if err != nil {
+					h.logger.Error("注册用户Function Call失败 %s: %v", config.FunctionName, err)
+					continue
+				}
+				h.logger.Info("注册用户自定义Function Call: %s", config.FunctionName)
+			}
+		}
+	}
+}
+
+// convertConfigToOpenAITool 将用户AI配置转换为OpenAI工具格式
+func (h *ConnectionHandler) convertConfigToOpenAITool(config *models.UserAIConfig) *openai.Tool {
+	if config.ConfigType != "function_call" || config.FunctionName == "" {
+		return nil
+	}
+
+	// 构建OpenAI工具
+	tool := &openai.Tool{
+		Type: openai.ToolTypeFunction,
+		Function: &openai.FunctionDefinition{
+			Name:        config.FunctionName,
+			Description: config.Description,
+			Parameters:  config.Parameters,
+		},
+	}
+
+	return tool
+}
+
+// executeUserFunctionCall 执行用户自定义Function Call
+func (h *ConnectionHandler) executeUserFunctionCall(config *models.UserAIConfig, args map[string]interface{}) (interface{}, error) {
+	h.logger.Info("执行用户自定义Function Call: %s", config.FunctionName)
+
+	// 这里可以根据配置类型执行不同的逻辑
+	// 例如调用MCP服务器、执行本地脚本等
+	if config.MCPServerURL != "" {
+		// 调用MCP服务器
+		h.logger.Info("调用MCP服务器: %s", config.MCPServerURL)
+		// TODO: 实现MCP服务器调用逻辑
+	}
+
+	// 返回执行结果
+	return map[string]interface{}{
+		"function": config.FunctionName,
+		"result":   "执行成功",
+		"args":     args,
+	}, nil
 }
