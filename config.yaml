@@ -109,7 +109,7 @@ local_mcp_fun: # 本地MCP功能配置
 selected_module:
   ASR: DoubaoASR
   # TTS: DoubaoTTS
-  LLM: RouterLLM
+  LLM: QwenLLM
   VLLLM: ChatGLMVLLM
 
 # ASR配置
@@ -118,8 +118,8 @@ ASR:
     # 火山 流式语音识别大模型-小时版， https://console.volcengine.com/ark/region:ark+cn-beijing/tts/speechRecognition
     # 开通功能，有20小时免费额度
     type: doubao
-    appid: "6760719093"
-    access_token: rtoMm7nNXA3hMP5HUGKNzS4IrrGinmgM
+    appid: "4261780370"
+    access_token: mJA9-zhXX646hmqDifnEP0jd9TISccdg
     output_dir: tmp/
 
   GoSherpaASR:
