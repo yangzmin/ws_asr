@@ -94,6 +94,14 @@ type FunctionCall struct {
 	Arguments string `json:"arguments"`
 }
 
+type FunctionCallResult struct {
+	Function string                 `json:"function"`
+	Result   string                 `json:"result"`
+	Args     map[string]interface{} `json:"args"`
+	LLMType  string                 `json:"llm_type"`
+	Model    string                 `json:"model"`
+}
+
 // Response LLM响应结构
 type Response struct {
 	Content    string     `json:"content,omitempty"`

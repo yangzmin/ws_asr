@@ -72,14 +72,20 @@ func (p *Provider) Response(ctx context.Context, sessionID string, messages []ty
 			}
 		}
 
+		chatRequest := openai.ChatCompletionRequest{
+			Model:     p.Config().ModelName,
+			Messages:  chatMessages,
+			Stream:    true,
+			MaxTokens: p.maxTokens,
+		}
+
+		if extra, ok := p.Config().Extra["enable_search"]; ok && extra.(bool) {
+			chatRequest.EnableSearch = true
+		}
+
 		stream, err := p.client.CreateChatCompletionStream(
 			ctx,
-			openai.ChatCompletionRequest{
-				Model:     p.Config().ModelName,
-				Messages:  chatMessages,
-				Stream:    true,
-				MaxTokens: p.maxTokens,
-			},
+			chatRequest,
 		)
 		if err != nil {
 			responseChan <- fmt.Sprintf("【OpenAI服务响应异常: %v】", err)

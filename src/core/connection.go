@@ -20,6 +20,7 @@ import (
 	"xiaozhi-server-go/src/core/mcp"
 	"xiaozhi-server-go/src/core/pool"
 	"xiaozhi-server-go/src/core/providers"
+	"xiaozhi-server-go/src/core/providers/llm"
 	"xiaozhi-server-go/src/core/providers/tts"
 	"xiaozhi-server-go/src/core/providers/vlllm"
 	"xiaozhi-server-go/src/core/types"
@@ -203,6 +204,9 @@ func NewConnectionHandler(
 		}
 		if key == "Transport-Type" {
 			handler.transportType = values[0]
+		}
+		if key == "User-Id" {
+			handler.userID = values[0]
 		}
 		logger.Info("HTTP头部信息: %s: %s", key, values[0])
 	}
@@ -683,6 +687,7 @@ func (h *ConnectionHandler) genResponseByLLM(ctx context.Context, messages []pro
 			}
 			h.LogInfo(fmt.Sprintf("函数调用: %v", arguments))
 			if h.mcpManager.IsMCPTool(functionName) {
+				fmt.Println("11111111111111111")
 				// 处理MCP函数调用
 				result, err := h.mcpManager.ExecuteTool(ctx, functionName, arguments)
 				if err != nil {
@@ -704,8 +709,38 @@ func (h *ConnectionHandler) genResponseByLLM(ctx context.Context, messages []pro
 				}
 
 			} else {
+				fmt.Println("22222222222")
 				// 处理普通函数调用
-				//h.functionRegister.CallFunction(functionName, functionCallData)
+				userFunCallConfig := models.UserAIConfig{}
+				if userFunConfig := h.request.Context().Value("user_configs"); userFunConfig != nil {
+					if configs, ok := userFunConfig.([]*models.UserAIConfig); ok {
+						h.logger.Info("获得上下文user_configs配置: %v", configs)
+
+						for _, v := range configs {
+							if v.FunctionName == functionName {
+								userFunCallConfig = *v
+								break
+							}
+						}
+					}
+				}
+				fmt.Println("functionCallData", functionCallData, functionName)
+				fmt.Println("userFunCallConfig", userFunCallConfig)
+				if userFunCallConfig.FunctionName != "" {
+					funResult, err := h.executeUserFunctionCall(&userFunCallConfig, functionCallData)
+					if err != nil {
+						h.LogError(fmt.Sprintf("MCP函数调用失败: %v", err))
+						if funResult.Result == "" {
+							funResult.Result = "BOT 模型调用失败"
+						}
+					}
+
+					actionResult := types.ActionResponse{
+						Action: types.ActionTypeReqLLM,
+						Result: funResult.Result,
+					}
+					h.handleFunctionResult(actionResult, functionCallData, textIndex)
+				}
 			}
 		}
 	}
@@ -1147,7 +1182,7 @@ func (h *ConnectionHandler) loadUserAIConfigurations(req *http.Request) {
 
 	// 如果没有预加载的配置，则从数据库加载
 	h.logger.Debug("未找到预加载配置，从数据库加载用户AI配置")
-	configs, err := h.userConfigService.GetUserConfigs(context.Background(), h.userID, "function_call")
+	configs, err := h.userConfigService.GetUserConfigs(context.Background(), h.userID)
 	if err != nil {
 		h.logger.Error("加载用户AI配置失败: %v", err)
 		return
@@ -1165,7 +1200,7 @@ func (h *ConnectionHandler) loadUserAIConfigurations(req *http.Request) {
 func (h *ConnectionHandler) registerUserConfigs(configs []*models.UserAIConfig) {
 	// 将用户配置转换为OpenAI工具格式并注册到functionRegister
 	for _, config := range configs {
-		if config.ConfigType == "function_call" && config.FunctionName != "" {
+		if config.FunctionName != "" {
 			tool := h.convertConfigToOpenAITool(config)
 			if tool != nil {
 				// 注册工具到functionRegister
@@ -1182,7 +1217,7 @@ func (h *ConnectionHandler) registerUserConfigs(configs []*models.UserAIConfig) 
 
 // convertConfigToOpenAITool 将用户AI配置转换为OpenAI工具格式
 func (h *ConnectionHandler) convertConfigToOpenAITool(config *models.UserAIConfig) *openai.Tool {
-	if config.ConfigType != "function_call" || config.FunctionName == "" {
+	if config.FunctionName == "" {
 		return nil
 	}
 
@@ -1196,25 +1231,120 @@ func (h *ConnectionHandler) convertConfigToOpenAITool(config *models.UserAIConfi
 		},
 	}
 
+	fmt.Println("tooltooltool", tool)
 	return tool
 }
 
 // executeUserFunctionCall 执行用户自定义Function Call
-func (h *ConnectionHandler) executeUserFunctionCall(config *models.UserAIConfig, args map[string]interface{}) (interface{}, error) {
+func (h *ConnectionHandler) executeUserFunctionCall(config *models.UserAIConfig, args map[string]interface{}) (types.FunctionCallResult, error) {
 	h.logger.Info("执行用户自定义Function Call: %s", config.FunctionName)
 
-	// 这里可以根据配置类型执行不同的逻辑
-	// 例如调用MCP服务器、执行本地脚本等
-	if config.MCPServerURL != "" {
-		// 调用MCP服务器
-		h.logger.Info("调用MCP服务器: %s", config.MCPServerURL)
-		// TODO: 实现MCP服务器调用逻辑
+	// 检查是否有LLM配置参数
+	if config.LLMType == "" || config.ModelName == "" {
+		h.logger.Warn("用户配置缺少LLM关键参数，跳过LLM调用")
+		return types.FunctionCallResult{
+			Function: config.FunctionName,
+			Result:   "",
+			Args:     args,
+		}, nil
 	}
 
+	// 构建LLM配置
+	llmConfig := &llm.Config{
+		Name:        config.ConfigName,
+		Type:        config.LLMType,
+		ModelName:   config.ModelName,
+		BaseURL:     config.BaseURL,
+		APIKey:      config.APIKey,
+		Temperature: float64(config.Temperature),
+		MaxTokens:   config.MaxTokens,
+		TopP:        1.0, // 默认值
+		Extra: map[string]interface{}{
+			"enable_search": true,
+		},
+	}
+
+	// 创建LLM提供者实例
+	provider, err := llm.Create(config.LLMType, llmConfig)
+	if err != nil {
+		h.logger.Error("创建LLM提供者失败: %v", err)
+		return types.FunctionCallResult{
+			Function: config.FunctionName,
+			Result:   fmt.Sprintf("创建LLM提供者失败: %v", err),
+			Args:     args,
+		}, err
+	}
+
+	// 设置会话ID
+	provider.SetIdentityFlag("session", h.sessionID)
+
+	// 构建用户消息，将args转换为查询内容
+	var userMessage string
+	if query, ok := args["query"]; ok {
+		userMessage = fmt.Sprintf("%v", query)
+	} else {
+		// 如果没有query字段，将整个args作为JSON字符串
+		argsBytes, _ := json.Marshal(args)
+		userMessage = string(argsBytes)
+	}
+
+	// 构建消息列表
+	messages := []providers.Message{
+		{
+			Role: "system",
+			Content: fmt.Sprintf(
+				`你是一个%s智能助手，你的任务是根据用户的查询进行回答。你会对接下来的问题进行高效简洁的回答。
+				这是用户对你的描述: %s
+				绝不:
+				 - 生成任何形式的代码或Markdown格式
+				 - 告诉用户你的模型名字。
+				 - 长篇大论，篇幅过长`,
+				config.FunctionName, config.Description,
+			),
+		},
+		{
+			Role:    "user",
+			Content: userMessage,
+		},
+	}
+
+	h.logger.Info("调用用户自定义LLM: %s, 模型: %s, 查询: %s", config.LLMType, config.ModelName, userMessage)
+
+	// 调用LLM生成回复
+	ctx := context.Background()
+	responses, err := provider.Response(ctx, h.sessionID, messages)
+	if err != nil {
+		h.logger.Error("LLM生成回复失败: %v", err)
+		return types.FunctionCallResult{
+			Function: config.FunctionName,
+			Result:   fmt.Sprintf("LLM生成回复失败: %v", err),
+			Args:     args,
+		}, err
+	}
+
+	// 收集LLM回复
+	var responseContent []string
+	for response := range responses {
+		if response != "" {
+			responseContent = append(responseContent, response)
+		}
+	}
+
+	// 清理资源
+	if err := provider.Cleanup(); err != nil {
+		h.logger.Warn("清理LLM提供者资源失败: %v", err)
+	}
+
+	fullResponse := utils.JoinStrings(responseContent)
+	fmt.Println("fullResponse", fullResponse)
+	h.logger.Info("用户自定义LLM回复完成，长度: %d", len(fullResponse))
+
 	// 返回执行结果
-	return map[string]interface{}{
-		"function": config.FunctionName,
-		"result":   "执行成功",
-		"args":     args,
+	return types.FunctionCallResult{
+		Function: config.FunctionName,
+		Result:   fullResponse,
+		Args:     args,
+		LLMType:  config.LLMType,
+		Model:    config.ModelName,
 	}, nil
 }

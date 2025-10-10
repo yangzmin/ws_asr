@@ -19,22 +19,22 @@ type UserAIConfigService interface {
 	// CRUD操作
 	CreateConfig(ctx context.Context, config *models.UserAIConfig) error
 	GetConfigByID(ctx context.Context, id uint) (*models.UserAIConfig, error)
-	GetUserConfigs(ctx context.Context, userID string, configType string) ([]*models.UserAIConfig, error)
+	GetUserConfigs(ctx context.Context, userID string) ([]*models.UserAIConfig, error)
 	UpdateConfig(ctx context.Context, config *models.UserAIConfig) error
 	DeleteConfig(ctx context.Context, id uint) error
-	
+
 	// 业务逻辑
-	GetActiveConfigs(ctx context.Context, userID string, configType string) ([]*models.UserAIConfig, error)
+	GetActiveConfigs(ctx context.Context, userID string) ([]*models.UserAIConfig, error)
 	SetConfigPriority(ctx context.Context, id uint, priority int) error
 	ToggleConfigStatus(ctx context.Context, id uint, isActive bool) error
-	
+
 	// 配置验证
 	ValidateLLMConfig(ctx context.Context, config *models.UserAIConfig) error
-	ValidateFunctionConfig(ctx context.Context, config *models.UserAIConfig) error
-	
+	CheckFunctionNameUnique(ctx context.Context, userID string, functionName string, excludeID uint) error
+
 	// 缓存用户配置到会话
 	CacheUserConfigsToSession(userID string, sessionID string) error
-	
+
 	// 从缓存获取用户配置
 	GetCachedUserConfigs(userID string) ([]*models.UserAIConfig, error)
 }
@@ -58,23 +58,12 @@ func (s *DefaultUserAIConfigService) CreateConfig(ctx context.Context, config *m
 	// 设置创建时间
 	config.CreatedAt = time.Now()
 	config.UpdatedAt = time.Now()
-	
-	// 验证配置
-	if config.ConfigType == "llm" {
-		if err := s.ValidateLLMConfig(ctx, config); err != nil {
-			return fmt.Errorf("LLM配置验证失败: %v", err)
-		}
-	} else if config.ConfigType == "function_call" {
-		if err := s.ValidateFunctionConfig(ctx, config); err != nil {
-			return fmt.Errorf("Function Call配置验证失败: %v", err)
-		}
-	}
-	
+
 	if err := s.db.WithContext(ctx).Create(config).Error; err != nil {
 		s.logger.Error("创建AI配置失败: %v", err)
 		return err
 	}
-	
+
 	s.logger.Info("用户 %s 创建AI配置成功: %s (ID: %d)", config.UserID, config.ConfigName, config.ID)
 	return nil
 }
@@ -93,14 +82,10 @@ func (s *DefaultUserAIConfigService) GetConfigByID(ctx context.Context, id uint)
 }
 
 // GetUserConfigs 获取用户的所有配置
-func (s *DefaultUserAIConfigService) GetUserConfigs(ctx context.Context, userID string, configType string) ([]*models.UserAIConfig, error) {
+func (s *DefaultUserAIConfigService) GetUserConfigs(ctx context.Context, userID string) ([]*models.UserAIConfig, error) {
 	var configs []*models.UserAIConfig
 	query := s.db.WithContext(ctx).Where("user_id = ?", userID)
-	
-	if configType != "" {
-		query = query.Where("config_type = ?", configType)
-	}
-	
+
 	err := query.Order("priority DESC, created_at DESC").Find(&configs).Error
 	return configs, err
 }
@@ -108,23 +93,17 @@ func (s *DefaultUserAIConfigService) GetUserConfigs(ctx context.Context, userID 
 // UpdateConfig 更新配置
 func (s *DefaultUserAIConfigService) UpdateConfig(ctx context.Context, config *models.UserAIConfig) error {
 	// 验证配置
-	if config.ConfigType == "llm" {
-		if err := s.ValidateLLMConfig(ctx, config); err != nil {
-			return fmt.Errorf("LLM配置验证失败: %v", err)
-		}
-	} else if config.ConfigType == "function_call" {
-		if err := s.ValidateFunctionConfig(ctx, config); err != nil {
-			return fmt.Errorf("Function Call配置验证失败: %v", err)
-		}
+	if err := s.ValidateLLMConfig(ctx, config); err != nil {
+		return fmt.Errorf("LLM配置验证失败: %v", err)
 	}
-	
+
 	config.UpdatedAt = time.Now()
-	
+
 	if err := s.db.WithContext(ctx).Save(config).Error; err != nil {
 		s.logger.Error("更新AI配置失败: %v", err)
 		return err
 	}
-	
+
 	s.logger.Info("用户 %s 更新AI配置成功: %s (ID: %d)", config.UserID, config.ConfigName, config.ID)
 	return nil
 }
@@ -136,24 +115,20 @@ func (s *DefaultUserAIConfigService) DeleteConfig(ctx context.Context, id uint) 
 		s.logger.Error("删除AI配置失败: %v", result.Error)
 		return result.Error
 	}
-	
+
 	if result.RowsAffected == 0 {
 		return fmt.Errorf("配置不存在")
 	}
-	
+
 	s.logger.Info("删除AI配置成功 (ID: %d)", id)
 	return nil
 }
 
 // GetActiveConfigs 获取用户的活跃配置
-func (s *DefaultUserAIConfigService) GetActiveConfigs(ctx context.Context, userID string, configType string) ([]*models.UserAIConfig, error) {
+func (s *DefaultUserAIConfigService) GetActiveConfigs(ctx context.Context, userID string) ([]*models.UserAIConfig, error) {
 	var configs []*models.UserAIConfig
 	query := s.db.WithContext(ctx).Where("user_id = ? AND is_active = ?", userID, true)
-	
-	if configType != "" {
-		query = query.Where("config_type = ?", configType)
-	}
-	
+
 	err := query.Order("priority DESC, created_at DESC").Find(&configs).Error
 	return configs, err
 }
@@ -166,15 +141,15 @@ func (s *DefaultUserAIConfigService) SetConfigPriority(ctx context.Context, id u
 			"priority":   priority,
 			"updated_at": time.Now(),
 		})
-	
+
 	if result.Error != nil {
 		return result.Error
 	}
-	
+
 	if result.RowsAffected == 0 {
 		return fmt.Errorf("配置不存在")
 	}
-	
+
 	return nil
 }
 
@@ -186,32 +161,36 @@ func (s *DefaultUserAIConfigService) ToggleConfigStatus(ctx context.Context, id 
 			"is_active":  isActive,
 			"updated_at": time.Now(),
 		})
-	
+
 	if result.Error != nil {
 		return result.Error
 	}
-	
+
 	if result.RowsAffected == 0 {
 		return fmt.Errorf("配置不存在")
 	}
-	
+
 	return nil
 }
 
 // ValidateLLMConfig 验证LLM配置
 func (s *DefaultUserAIConfigService) ValidateLLMConfig(ctx context.Context, config *models.UserAIConfig) error {
-	if config.ConfigType != "llm" {
-		return fmt.Errorf("配置类型不是LLM")
+	if config.FunctionName == "" {
+		return fmt.Errorf("函数名称不能为空")
 	}
-	
+
+	if config.Description == "" {
+		return fmt.Errorf("函数描述不能为空")
+	}
+
 	if config.LLMType == "" {
 		return fmt.Errorf("LLM类型不能为空")
 	}
-	
+
 	if config.ModelName == "" {
 		return fmt.Errorf("模型名称不能为空")
 	}
-	
+
 	// 验证支持的LLM类型
 	supportedTypes := []string{"qwen", "chatglm", "ollama", "coze", "openai", "claude"}
 	isSupported := false
@@ -221,61 +200,36 @@ func (s *DefaultUserAIConfigService) ValidateLLMConfig(ctx context.Context, conf
 			break
 		}
 	}
-	
+
 	if !isSupported {
 		return fmt.Errorf("不支持的LLM类型: %s", config.LLMType)
 	}
-	
+
 	// 验证温度参数
 	if config.Temperature < 0 || config.Temperature > 2 {
 		return fmt.Errorf("温度参数必须在0-2之间")
 	}
-	
+
 	// 验证最大token数
 	if config.MaxTokens < 0 || config.MaxTokens > 32000 {
 		return fmt.Errorf("最大token数必须在0-32000之间")
 	}
-	
-	return nil
-}
 
-// ValidateFunctionConfig 验证Function Call配置
-func (s *DefaultUserAIConfigService) ValidateFunctionConfig(ctx context.Context, config *models.UserAIConfig) error {
-	if config.ConfigType != "function_call" {
-		return fmt.Errorf("配置类型不是Function Call")
-	}
-	
-	if config.FunctionName == "" {
-		return fmt.Errorf("函数名称不能为空")
-	}
-	
-	if config.Description == "" {
-		return fmt.Errorf("函数描述不能为空")
-	}
-	
-	// 验证参数格式
-	if config.Parameters != nil {
-		var params map[string]interface{}
-		if err := json.Unmarshal(config.Parameters, &params); err != nil {
-			return fmt.Errorf("参数格式无效: %v", err)
-		}
-	}
-	
 	return nil
 }
 
 // CacheUserConfigsToSession 缓存用户配置到会话
 func (s *DefaultUserAIConfigService) CacheUserConfigsToSession(userID string, sessionID string) error {
-	configs, err := s.GetActiveConfigs(context.Background(), userID, "")
+	configs, err := s.GetActiveConfigs(context.Background(), userID)
 	if err != nil {
 		return err
 	}
-	
+
 	configData, err := json.Marshal(configs)
 	if err != nil {
 		return err
 	}
-	
+
 	sessionConfig := &models.UserSessionConfig{
 		UserID:      userID,
 		SessionID:   sessionID,
@@ -284,7 +238,7 @@ func (s *DefaultUserAIConfigService) CacheUserConfigsToSession(userID string, se
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
-	
+
 	// 使用UPSERT操作，如果存在则更新，不存在则创建
 	err = s.db.Where("user_id = ? AND session_id = ?", userID, sessionID).
 		Assign(map[string]interface{}{
@@ -293,12 +247,12 @@ func (s *DefaultUserAIConfigService) CacheUserConfigsToSession(userID string, se
 			"updated_at":   sessionConfig.UpdatedAt,
 		}).
 		FirstOrCreate(sessionConfig).Error
-	
+
 	if err != nil {
 		s.logger.Error("缓存用户配置到会话失败: %v", err)
 		return err
 	}
-	
+
 	s.logger.Debug("用户 %s 的配置已缓存到会话 %s", userID, sessionID)
 	return nil
 }
@@ -309,22 +263,49 @@ func (s *DefaultUserAIConfigService) GetCachedUserConfigs(userID string) ([]*mod
 	err := s.db.Where("user_id = ? AND expires_at > ?", userID, time.Now()).
 		Order("updated_at DESC").
 		First(&sessionConfig).Error
-	
+
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			// 如果缓存不存在，直接从数据库获取
-			return s.GetActiveConfigs(context.Background(), userID, "")
+			return s.GetActiveConfigs(context.Background(), userID)
 		}
 		return nil, err
 	}
-	
+
 	var configs []*models.UserAIConfig
 	err = json.Unmarshal(sessionConfig.SessionData, &configs)
 	if err != nil {
 		s.logger.Warn("解析缓存的用户配置失败: %v", err)
 		// 如果解析失败，从数据库重新获取
-		return s.GetActiveConfigs(context.Background(), userID, "")
+		return s.GetActiveConfigs(context.Background(), userID)
 	}
-	
+
 	return configs, nil
+}
+
+// CheckFunctionNameUnique 检查function name在用户范围内是否唯一
+func (s *DefaultUserAIConfigService) CheckFunctionNameUnique(ctx context.Context, userID string, functionName string, excludeID uint) error {
+	if functionName == "" {
+		return nil // 如果function name为空，不需要检查唯一性
+	}
+
+	var count int64
+	query := s.db.WithContext(ctx).Model(&models.UserAIConfig{}).
+		Where("user_id = ? AND function_name = ?", userID, functionName)
+
+	// 如果是更新操作，排除当前记录
+	if excludeID > 0 {
+		query = query.Where("id != ?", excludeID)
+	}
+
+	if err := query.Count(&count).Error; err != nil {
+		s.logger.Error("检查function name唯一性失败: %v", err)
+		return fmt.Errorf("检查function name唯一性失败: %v", err)
+	}
+
+	if count > 0 {
+		return fmt.Errorf("function name '%s' 已存在，请使用不同的名称", functionName)
+	}
+
+	return nil
 }

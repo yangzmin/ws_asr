@@ -33,6 +33,7 @@ func (fr *FunctionRegistry) GetFunction(name string) (openai.Tool, error) {
 }
 
 func (fr *FunctionRegistry) GetAllFunctions() []openai.Tool {
+	fmt.Println("fr.functions", fr.functions)
 	functions := make([]openai.Tool, 0, len(fr.functions))
 	for _, function := range fr.functions {
 		functions = append(functions, function)

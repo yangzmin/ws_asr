@@ -174,6 +174,7 @@ func (t *WebSocketTransport) handleWebSocket(w http.ResponseWriter, r *http.Requ
 
 	// 预加载用户配置，避免在ConnectionHandler中重复查询数据库
 	userConfigs, err := t.preloadUserConfigs(fmt.Sprintf("%d", userID))
+	fmt.Println("userConfigs", userConfigs)
 	if err != nil {
 		t.logger.Warn("预加载用户配置失败: %v", err)
 		// 不阻断连接，继续处理
@@ -226,7 +227,7 @@ func (t *WebSocketTransport) handleWebSocket(w http.ResponseWriter, r *http.Requ
 // preloadUserConfigs 预加载用户配置
 func (t *WebSocketTransport) preloadUserConfigs(userID string) ([]*models.UserAIConfig, error) {
 	// 获取用户的活跃Function Call配置
-	configs, err := t.userConfigService.GetActiveConfigs(context.Background(), userID, "function_call")
+	configs, err := t.userConfigService.GetActiveConfigs(context.Background(), userID)
 	if err != nil {
 		return nil, fmt.Errorf("获取用户配置失败: %v", err)
 	}
