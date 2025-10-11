@@ -209,6 +209,146 @@
         </div>
       </div>
 
+      <!-- MCP 工具管理区域 -->
+      <div class="mcp-section">
+        <h3>MCP 工具管理</h3>
+        
+        <!-- MCP 状态显示 -->
+        <div class="mcp-status">
+          <div class="status-item">
+            <span class="label">MCP状态:</span>
+            <span class="value" :class="mcpStatus">{{ getMcpStatusText() }}</span>
+          </div>
+          <div class="status-item" v-if="mcpTools.length > 0">
+            <span class="label">可用工具:</span>
+            <span class="value">{{ mcpTools.length }} 个</span>
+          </div>
+        </div>
+
+        <!-- MCP 工具列表 -->
+        <div class="mcp-tools-list" v-if="mcpTools.length > 0">
+          <h4>可用工具列表</h4>
+          <div class="tools-grid">
+            <div 
+              v-for="(tool, index) in mcpTools" 
+              :key="index" 
+              class="tool-card"
+              :class="{ 'tool-selected': selectedTool === tool }"
+              @click="selectTool(tool)"
+            >
+              <div class="tool-header">
+                <span class="tool-name">{{ tool.name }}</span>
+                <button 
+                  @click.stop="callTool(tool)" 
+                  :disabled="!wsConnected || mcpStatus !== 'ready'"
+                  class="btn-call-tool"
+                >
+                  调用
+                </button>
+              </div>
+              <div class="tool-description">{{ tool.description }}</div>
+              <div class="tool-params" v-if="tool.inputSchema && tool.inputSchema.properties">
+                <span class="params-label">参数:</span>
+                <span class="params-list">
+                  {{ Object.keys(tool.inputSchema.properties).join(', ') }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- MCP 工具调用界面 -->
+        <div class="mcp-tool-call" v-if="selectedTool">
+          <h4>调用工具: {{ selectedTool.name }}</h4>
+          <div class="tool-call-form">
+            <div class="tool-description">{{ selectedTool.description }}</div>
+            
+            <!-- 动态参数输入 -->
+            <div class="tool-params-input" v-if="selectedTool.inputSchema && selectedTool.inputSchema.properties">
+              <div 
+                v-for="(param, paramName) in selectedTool.inputSchema.properties" 
+                :key="paramName"
+                class="param-input-group"
+              >
+                <label :for="'param-' + paramName">{{ paramName }}:</label>
+                <input 
+                  :id="'param-' + paramName"
+                  type="text" 
+                  v-model="toolCallParams[paramName]" 
+                  :placeholder="param.description || '请输入' + paramName"
+                  :required="selectedTool.inputSchema.required && selectedTool.inputSchema.required.includes(paramName)"
+                  class="param-input"
+                />
+                <span class="param-description" v-if="param.description">{{ param.description }}</span>
+              </div>
+            </div>
+            
+            <!-- 调用按钮 -->
+            <div class="tool-call-actions">
+              <button 
+                @click="callSelectedTool" 
+                :disabled="!wsConnected || mcpStatus !== 'ready' || isCallingTool"
+                class="btn-call-selected-tool"
+              >
+                {{ isCallingTool ? '调用中...' : '执行工具' }}
+              </button>
+              <button @click="clearSelectedTool" class="btn-clear-tool">
+                清除选择
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- MCP 工具调用结果 -->
+        <div class="mcp-tool-result" v-if="lastToolResult">
+          <h4>工具调用结果</h4>
+          <div class="result-content">
+            <div class="result-header">
+              <span class="result-tool">工具: {{ lastToolResult.toolName }}</span>
+              <span class="result-time">时间: {{ formatTime(lastToolResult.timestamp) }}</span>
+            </div>
+            <div class="result-data">
+              <pre>{{ JSON.stringify(lastToolResult.result, null, 2) }}</pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- MCP 快捷操作 -->
+        <div class="mcp-quick-actions">
+          <h4>快捷操作</h4>
+          <div class="quick-actions-grid">
+            <button 
+              @click="sendMcpQuickCommand('帮我拍照')"
+              :disabled="!wsConnected || mcpStatus !== 'ready'"
+              class="btn-quick-action"
+            >
+              📷 拍照
+            </button>
+            <button 
+              @click="sendMcpQuickCommand('调整音量到50%')"
+              :disabled="!wsConnected || mcpStatus !== 'ready'"
+              class="btn-quick-action"
+            >
+              🔊 调整音量
+            </button>
+            <button 
+              @click="sendMcpQuickCommand('调整屏幕亮度')"
+              :disabled="!wsConnected || mcpStatus !== 'ready'"
+              class="btn-quick-action"
+            >
+              💡 调整亮度
+            </button>
+            <button 
+              @click="sendMcpQuickCommand('切换主题')"
+              :disabled="!wsConnected || mcpStatus !== 'ready'"
+              class="btn-quick-action"
+            >
+              🎨 切换主题
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- 文本聊天区域 -->
       <div class="text-chat-section">
         <h3>文本对话</h3>
@@ -485,6 +625,14 @@ const visionPrompt = ref('')
 const iotDescriptors = ref('')
 const iotStates = ref('')
 
+// MCP 相关
+const mcpStatus = ref('disconnected') // disconnected, connecting, ready, error
+const mcpTools = ref([]) // 可用的MCP工具列表
+const selectedTool = ref(null) // 当前选中的工具
+const toolCallParams = ref({}) // 工具调用参数
+const isCallingTool = ref(false) // 是否正在调用工具
+const lastToolResult = ref(null) // 最后一次工具调用结果
+
 // 对话历史
 const messages = ref([])
 const messagesContainer = ref(null)
@@ -518,6 +666,7 @@ const connectWebSocket = () => {
   console.log('连接WebSocket URL:', wsUrl)
   
   const ws = new WebSocket(wsUrl)
+  wsRef.value = ws // 将 WebSocket 实例保存到 ref 中
   
   // 设置请求头（通过URL参数或连接后发送）
   ws.onopen = () => {
@@ -971,6 +1120,9 @@ const handleWebSocketMessage = (data) => {
         break
       case 'llm':
         handleLlmMessage(message)
+        break
+      case 'mcp':
+        handleMcpMessage(message)
         break
       case 'error':
         handleErrorMessage(message)
@@ -2103,6 +2255,565 @@ const getMessageTypeText = (type) => {
  */
 const formatTime = (date) => {
   return date.toLocaleTimeString()
+}
+
+// ==================== MCP 相关方法 ====================
+
+/**
+ * 处理 MCP 消息
+ * 注意：服务端(xiaozhi-server-go)是 MCP 客户端，设备端是 MCP 服务器
+ */
+const handleMcpMessage = (message) => {
+  console.log('收到MCP消息:', message)
+  
+  const payload = message.payload || {}
+  const method = payload.method || ''
+  const id = payload.id || ''
+  
+  // 根据消息类型处理
+  if (payload.result !== undefined || payload.error !== undefined) {
+    // 这是响应消息（来自设备端 MCP 服务器的响应）
+    handleMcpResponse(payload)
+  } else if (method) {
+    // 这是请求消息（服务端 MCP 客户端发送的请求）
+    switch (method) {
+      case 'initialize':
+        handleMcpInitializeRequest(payload)
+        break
+      case 'tools/list':
+        handleMcpToolsListRequest(payload)
+        break
+      case 'tools/call':
+        handleMcpToolCallRequest(payload)
+        break
+      default:
+        console.log('未知MCP请求方法:', method)
+        addMessage('mcp', `未知MCP请求: ${method}`)
+    }
+  } else {
+    console.log('未知MCP消息格式:', message)
+    addMessage('mcp', `未知MCP消息: ${JSON.stringify(message)}`)
+  }
+}
+
+/**
+ * 处理 MCP 初始化请求（服务端发送给设备端）
+ */
+const handleMcpInitializeRequest = (payload) => {
+  console.log('服务端发送MCP初始化请求:', payload)
+  mcpStatus.value = 'connecting'
+  addMessage('mcp', '收到服务端初始化请求，正在发送响应...')
+  
+  // 发送初始化响应给服务端
+  const initializeResponse = {
+    type: 'mcp',
+    session_id: payload.session_id || sessionId.value,
+    payload: {
+      jsonrpc: '2.0',
+      id: payload.id, // 使用请求的ID
+      result: {
+        protocolVersion: '2024-11-05',
+        capabilities: {
+          tools: {
+            listChanged: true
+          },
+          logging: {}
+        },
+        serverInfo: {
+          name: 'xiaozhi-device',
+          version: '1.0.0'
+        }
+      }
+    }
+  }
+  
+  if (wsRef.value && wsRef.value.readyState === WebSocket.OPEN) {
+    wsRef.value.send(JSON.stringify(initializeResponse))
+    console.log('已发送MCP初始化响应:', initializeResponse)
+    addMessage('mcp', '已向服务端发送初始化响应')
+  } else {
+    console.error('WebSocket连接未就绪，无法发送初始化响应')
+    addMessage('mcp', 'WebSocket连接未就绪，无法发送初始化响应')
+  }
+}
+
+/**
+ * 处理 MCP 工具列表请求（服务端发送给设备端）
+ */
+const handleMcpToolsListRequest = (payload) => {
+  console.log('服务端请求工具列表:', payload)
+  addMessage('mcp', '收到服务端工具列表请求，正在发送响应...')
+  
+  // 发送工具列表响应给服务端
+  const toolsListResponse = {
+    type: 'mcp',
+    session_id: payload.session_id || sessionId.value,
+    payload: {
+      jsonrpc: '2.0',
+      id: payload.id, // 使用请求的ID
+      result: {
+        tools: [
+        {
+          name: 'echo',
+          description: '回显输入的文本',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              text: {
+                type: 'string',
+                description: '要回显的文本'
+              }
+            },
+            required: ['text']
+          }
+        },
+        {
+          name: 'get_time',
+          description: '获取当前时间',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+            required: []
+          }
+        },
+        {
+          name: 'calculate',
+          description: '执行数学计算',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              expression: {
+                type: 'string',
+                description: '数学表达式，如 "2 + 3 * 4"'
+              }
+            },
+            required: ['expression']
+          }
+        },
+        {
+          name: 'self.camera.take_photo',
+          description: '拍照并分析图像内容',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              question: {
+                type: 'string',
+                description: '对图像的问题或分析要求，如"这是什么？"、"描述一下这个场景"'
+              }
+            },
+            required: ['question']
+          }
+        }
+      ]
+    }
+  }
+}
+  
+  if (wsRef.value && wsRef.value.readyState === WebSocket.OPEN) {
+    wsRef.value.send(JSON.stringify(toolsListResponse))
+    console.log('已发送MCP工具列表响应:', toolsListResponse)
+    addMessage('mcp', '已向服务端发送工具列表响应')
+  } else {
+    console.error('WebSocket连接未就绪，无法发送工具列表响应')
+    addMessage('mcp', 'WebSocket连接未就绪，无法发送工具列表响应')
+  }
+}
+
+/**
+ * 处理 MCP 工具调用请求（服务端发送给设备端）
+ */
+const handleMcpToolCallRequest = (payload) => {
+  console.log('服务端调用工具:', payload)
+  const toolName = payload.params?.name || '未知工具'
+  const toolArgs = payload.params?.arguments || {}
+  
+  isCallingTool.value = true
+  addMessage('mcp', `收到服务端工具调用请求: ${toolName}`)
+  
+  // 模拟工具执行并发送响应
+  setTimeout(async () => {
+    let result = null
+    let error = null
+    
+    try {
+      // 根据工具名称执行相应逻辑
+      switch (toolName) {
+        case 'echo':
+          result = {
+            content: [
+              {
+                type: 'text',
+                text: `回显: ${toolArgs.text || '空文本'}`
+              }
+            ]
+          }
+          break
+        case 'get_time':
+          result = {
+            content: [
+              {
+                type: 'text',
+                text: `当前时间: ${new Date().toLocaleString()}`
+              }
+            ]
+          }
+          break
+        case 'calculate':
+          try {
+            // 简单的数学表达式计算（仅用于演示）
+            const expression = toolArgs.expression || '0'
+            const calcResult = eval(expression) // 注意：实际应用中不应使用eval
+            result = {
+              content: [
+                {
+                  type: 'text',
+                  text: `计算结果: ${expression} = ${calcResult}`
+                }
+              ]
+            }
+          } catch (e) {
+            error = {
+              code: -32000,
+              message: `计算错误: ${e.message}`
+            }
+          }
+          break
+        case 'self.camera.take_photo':
+          // 拍照工具处理
+          const question = toolArgs.question || '这是什么？'
+          addMessage('mcp', `正在拍照并分析: ${question}`)
+          
+          // 尝试获取摄像头权限并拍照
+          try {
+            const photoResult = await takeCameraPhoto(question)
+            result = {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(photoResult)
+                }
+              ]
+            }
+          } catch (e) {
+            console.error('拍照失败:', e)
+            result = {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify({
+                    success: false,
+                    result: '',
+                    message: `拍照失败: ${e.message}`
+                  })
+                }
+              ]
+            }
+          }
+          break
+        default:
+          error = {
+            code: -32601,
+            message: `未知工具: ${toolName}`
+          }
+      }
+    } catch (e) {
+      error = {
+        code: -32000,
+        message: `工具执行错误: ${e.message}`
+      }
+    }
+    
+    // 发送工具调用响应
+    const toolCallResponse = {
+      type: 'mcp',
+      session_id: payload.session_id || sessionId.value,
+      payload: {
+        jsonrpc: '2.0',
+        id: payload.id, // 使用请求的ID
+        ...(error ? { error } : { result })
+      }
+    }
+    
+    if (wsRef.value && wsRef.value.readyState === WebSocket.OPEN) {
+       wsRef.value.send(JSON.stringify(toolCallResponse))
+       console.log('已发送MCP工具调用响应:', toolCallResponse)
+       addMessage('mcp', `已向服务端发送工具调用响应: ${toolName}`)
+     } else {
+       console.error('WebSocket连接未就绪，无法发送工具调用响应')
+       addMessage('mcp', 'WebSocket连接未就绪，无法发送工具调用响应')
+     }
+    
+    isCallingTool.value = false
+  }, 1000) // 模拟1秒的工具执行时间
+}
+
+/**
+ * 处理 MCP 响应消息（设备端返回的响应）
+ */
+const handleMcpResponse = (payload) => {
+  console.log('收到设备端MCP响应:', payload)
+  
+  const id = payload.id
+  
+  if (payload.error) {
+    // 错误响应
+    handleMcpError(payload)
+    return
+  }
+  
+  // 成功响应
+  if (id === 1) {
+    // 初始化响应
+    mcpStatus.value = 'ready'
+    addMessage('mcp', '设备端MCP初始化完成')
+    console.log('MCP初始化成功，设备信息:', payload.result?.serverInfo)
+  } else if (id === 2) {
+    // 工具列表响应
+    if (payload.result && payload.result.tools) {
+      mcpTools.value = payload.result.tools
+      mcpStatus.value = 'ready'
+      addMessage('mcp', `设备端返回 ${mcpTools.value.length} 个MCP工具`)
+      console.log('设备端工具列表:', mcpTools.value)
+    } else {
+      console.warn('设备端工具列表格式异常:', payload)
+      addMessage('mcp', '设备端工具列表格式异常')
+    }
+  } else {
+    // 工具调用响应
+    const result = {
+      toolName: '未知工具',
+      result: payload.result,
+      timestamp: new Date()
+    }
+    
+    lastToolResult.value = result
+    isCallingTool.value = false
+    addMessage('mcp', '设备端工具调用完成')
+    console.log('工具调用结果:', result)
+  }
+}
+
+/**
+ * 处理 MCP 错误响应
+ */
+const handleMcpError = (payload) => {
+  console.error('设备端MCP错误:', payload.error)
+  
+  const errorMsg = payload.error?.message || '未知MCP错误'
+  mcpStatus.value = 'error'
+  isCallingTool.value = false
+  
+  addMessage('error', `设备端MCP错误: ${errorMsg}`)
+}
+
+/**
+ * 获取 MCP 状态文本
+ */
+const getMcpStatusText = () => {
+  switch (mcpStatus.value) {
+    case 'disconnected': return '未连接'
+    case 'connecting': return '连接中'
+    case 'ready': return '就绪'
+    case 'error': return '错误'
+    default: return '未知'
+  }
+}
+
+/**
+ * 选择工具
+ */
+const selectTool = (tool) => {
+  selectedTool.value = tool
+  toolCallParams.value = {}
+  
+  // 初始化参数
+  if (tool.inputSchema && tool.inputSchema.properties) {
+    Object.keys(tool.inputSchema.properties).forEach(paramName => {
+      toolCallParams.value[paramName] = ''
+    })
+  }
+  
+  console.log('选择工具:', tool.name)
+  addMessage('mcp', `选择工具: ${tool.name}`)
+}
+
+/**
+ * 清除选择的工具
+ */
+const clearSelectedTool = () => {
+  selectedTool.value = null
+  toolCallParams.value = {}
+  addMessage('mcp', '清除工具选择')
+}
+
+/**
+ * 调用工具（快速调用）
+ * 注意：前端不直接发送 MCP 消息，而是通过服务端转发
+ */
+const callTool = (tool) => {
+  if (!wsRef.value || wsRef.value.readyState !== WebSocket.OPEN) {
+    message.error('WebSocket未连接')
+    return
+  }
+  
+  if (mcpStatus.value !== 'ready') {
+    message.error('MCP未就绪')
+    return
+  }
+  
+  isCallingTool.value = true
+  
+  // 发送工具调用请求给服务端，服务端会转发给设备端
+  const toolCallMessage = {
+    type: 'mcp_tool_call',
+    session_id: sessionId.value,
+    tool_name: tool.name,
+    arguments: {}
+  }
+  
+  wsRef.value.send(JSON.stringify(toolCallMessage))
+  console.log('请求服务端调用MCP工具:', toolCallMessage)
+  addMessage('mcp', `请求调用工具: ${tool.name}`)
+}
+
+/**
+ * 调用选中的工具（带参数）
+ * 注意：前端不直接发送 MCP 消息，而是通过服务端转发
+ */
+const callSelectedTool = () => {
+  if (!selectedTool.value) {
+    message.error('请先选择工具')
+    return
+  }
+  
+  if (!wsRef.value || wsRef.value.readyState !== WebSocket.OPEN) {
+    message.error('WebSocket未连接')
+    return
+  }
+  
+  if (mcpStatus.value !== 'ready') {
+    message.error('MCP未就绪')
+    return
+  }
+  
+  // 验证必需参数
+  if (selectedTool.value.inputSchema && selectedTool.value.inputSchema.required) {
+    for (const requiredParam of selectedTool.value.inputSchema.required) {
+      if (!toolCallParams.value[requiredParam] || !toolCallParams.value[requiredParam].trim()) {
+        message.error(`请填写必需参数: ${requiredParam}`)
+        return
+      }
+    }
+  }
+  
+  isCallingTool.value = true
+  
+  // 构建参数对象
+  const args = {}
+  Object.keys(toolCallParams.value).forEach(key => {
+    if (toolCallParams.value[key] && toolCallParams.value[key].trim()) {
+      args[key] = toolCallParams.value[key].trim()
+    }
+  })
+  
+  // 发送工具调用请求给服务端，服务端会转发给设备端
+  const toolCallMessage = {
+    type: 'mcp_tool_call',
+    session_id: sessionId.value,
+    tool_name: selectedTool.value.name,
+    arguments: args
+  }
+  
+  wsRef.value.send(JSON.stringify(toolCallMessage))
+  console.log('请求服务端调用MCP工具:', toolCallMessage)
+  addMessage('mcp', `请求调用工具: ${selectedTool.value.name}`)
+}
+
+/**
+ * 发送 MCP 快捷命令
+ */
+const sendMcpQuickCommand = (command) => {
+  if (!wsRef.value || wsRef.value.readyState !== WebSocket.OPEN) {
+    message.error('WebSocket未连接')
+    return
+  }
+  
+  // 发送文本消息，让服务端的LLM处理并调用相应的MCP工具
+  const textMessage = {
+    type: 'text',
+    text: command,
+    session_id: sessionId.value
+  }
+  
+  wsRef.value.send(JSON.stringify(textMessage))
+  console.log('发送MCP快捷命令:', command)
+  addMessage('user', command)
+}
+
+/**
+ * 拍照并分析图像
+ */
+const takeCameraPhoto = async (question) => {
+  try {
+    // 获取摄像头权限
+    const stream = await navigator.mediaDevices.getUserMedia({ 
+      video: { 
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      } 
+    })
+    
+    // 创建video元素
+    const video = document.createElement('video')
+    video.srcObject = stream
+    video.autoplay = true
+    
+    // 等待视频加载
+    await new Promise((resolve) => {
+      video.onloadedmetadata = resolve
+    })
+    
+    // 创建canvas进行截图
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(video, 0, 0)
+    
+    // 停止摄像头
+    stream.getTracks().forEach(track => track.stop())
+    
+    // 转换为blob
+    const blob = await new Promise(resolve => {
+      canvas.toBlob(resolve, 'image/jpeg', 0.8)
+    })
+    
+    // 发送到视觉分析服务
+    const formData = new FormData()
+    formData.append('image', blob, 'camera_photo.jpg')
+    formData.append('question', question)
+    
+    const response = await fetch('/api/vision/analyze', {
+      method: 'POST',
+      headers: {
+        'Device-ID': headerConfig.deviceId,
+        'Client-ID': headerConfig.clientId,
+        'Authorization': headerConfig.token ? `Bearer ${headerConfig.token}` : ''
+      },
+      body: formData
+    })
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+    
+    const result = await response.json()
+    return result
+    
+  } catch (error) {
+    console.error('拍照失败:', error)
+    throw error
+  }
 }
 
 /**

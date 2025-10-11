@@ -181,29 +181,3 @@ func (c *LocalClient) AddToolPlayMusic() error {
 
 	return nil
 }
-
-// AddToolTakePhoto 添加拍照工具
-func (c *LocalClient) AddToolTakePhoto() error {
-	InputSchema := ToolInputSchema{
-		Type:       "object",
-		Properties: map[string]any{},
-		Required:   []string{},
-	}
-
-	c.AddTool("take_photo",
-		"当用户想要拍照或拍摄照片时调用",
-		InputSchema,
-		func(ctx context.Context, args map[string]any) (interface{}, error) {
-			c.logger.Info("用户请求拍照")
-			res := types.ActionResponse{
-				Action: types.ActionTypeCallHandler, // 动作类型
-				Result: types.ActionResponseCall{
-					FuncName: "mcp_handler_take_photo", // 函数名
-					Args:     nil,                      // 函数参数
-				},
-			}
-			return res, nil
-		})
-
-	return nil
-}

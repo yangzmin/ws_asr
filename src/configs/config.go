@@ -80,12 +80,11 @@ type Config struct {
 	} `yaml:"log" json:"log"`
 
 	Web struct {
-		Enabled      bool   `yaml:"enabled" json:"enabled"`
-		Port         int    `yaml:"port" json:"port"`
-		StaticDir    string `yaml:"static_dir" json:"static_dir"`
-		Websocket    string `yaml:"websocket" json:"websocket"`
-		VisionURL    string `yaml:"vision" json:"vision"`
-		ActivateText string `yaml:"activate_text" json:"activate_text"` // 发送激活码时携带的文本
+		Enabled   bool   `yaml:"enabled" json:"enabled"`
+		Port      int    `yaml:"port" json:"port"`
+		StaticDir string `yaml:"static_dir" json:"static_dir"`
+		Websocket string `yaml:"websocket" json:"websocket"`
+		VisionURL string `yaml:"vision" json:"vision"`
 	} `yaml:"web" json:"web"`
 
 	DefaultPrompt    string   `yaml:"prompt"             json:"prompt"`

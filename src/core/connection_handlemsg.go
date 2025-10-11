@@ -82,8 +82,6 @@ func (h *ConnectionHandler) processClientTextMessage(ctx context.Context, text s
 		return h.clientAbortChat()
 	case "listen":
 		return h.handleListenMessage(msgMap)
-	case "iot":
-		return h.handleIotMessage(msgMap)
 	case "chat":
 		return h.handleChatMessage(ctx, text)
 	case "vision":
@@ -199,21 +197,6 @@ func (h *ConnectionHandler) handleListenMessage(msgMap map[string]interface{}) e
 			h.logger.Warn("detect消息既没有text也没有image参数")
 			return fmt.Errorf("detect消息缺少text或image参数")
 		}
-	}
-	return nil
-}
-
-// handleIotMessage 处理IOT设备消息
-func (h *ConnectionHandler) handleIotMessage(msgMap map[string]interface{}) error {
-	if descriptors, ok := msgMap["descriptors"].([]interface{}); ok {
-		// 处理设备描述符
-		// 这里需要实现具体的IOT设备描述符处理逻辑
-		h.LogInfo(fmt.Sprintf("收到IOT设备描述符：%v", descriptors))
-	}
-	if states, ok := msgMap["states"].([]interface{}); ok {
-		// 处理设备状态
-		// 这里需要实现具体的IOT设备状态处理逻辑
-		h.LogInfo(fmt.Sprintf("收到IOT设备状态：%v", states))
 	}
 	return nil
 }

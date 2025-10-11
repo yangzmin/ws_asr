@@ -1,8 +1,11 @@
 package core
 
 import (
+	"context"
+	"encoding/json"
 	"xiaozhi-server-go/src/core/types"
 	"xiaozhi-server-go/src/core/utils"
+	"xiaozhi-server-go/src/vision"
 )
 
 func (h *ConnectionHandler) initMCPResultHandlers() {
@@ -118,15 +121,18 @@ func (h *ConnectionHandler) mcp_handler_exit(args interface{}) {
 // mcp_handler_take_photo 处理拍照功能
 func (h *ConnectionHandler) mcp_handler_take_photo(args interface{}) {
 	h.logger.Info("收到拍照请求")
-	
-	// 播放拍照提示音
-	h.SystemSpeak("正在为您拍照，请稍等...")
-	
-	// 这里可以添加实际的拍照逻辑
-	// 例如：调用摄像头API、保存图片等
-	// 目前先返回成功消息
-	h.logger.Info("拍照功能已触发")
-	
-	// 拍照完成后的反馈
-	h.SystemSpeak("拍照完成！")
+
+	resultStr, _ := args.(string)
+	var visionResponse vision.VisionResponse
+	if err := json.Unmarshal([]byte(resultStr), &visionResponse); err != nil {
+		h.logger.Error("解析VisionResponse失败: %v", err)
+	}
+
+	if !visionResponse.Success {
+		h.logger.Error("拍照失败: %s", visionResponse.Message)
+		h.genResponseByLLM(context.Background(), h.dialogueManager.GetLLMDialogue(), h.talkRound)
+
+	}
+
+	h.SystemSpeak(visionResponse.Result)
 }

@@ -324,16 +324,16 @@ func (c *XiaoZhiMCPClient) SendMCPInitializeMessage() error {
 			"id":      mcpInitializeID,
 			"method":  "initialize",
 			"params": map[string]interface{}{
-				// "protocolVersion": "2024-11-05",
+				"protocolVersion": "2024-11-05",
 				"capabilities": map[string]interface{}{
 					"roots": map[string]interface{}{
 						"listChanged": true,
 					},
 					"sampling": map[string]interface{}{},
-					// "vision": map[string]interface{}{
-					// 	"url":   c.visionURL,
-					// 	"token": c.token,
-					// },
+					"vision": map[string]interface{}{
+						"url": c.visionURL,
+						// "token": c.token,
+					},
 				},
 				"clientInfo": map[string]interface{}{
 					"name":    "angrymiao client",
