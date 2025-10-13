@@ -40,6 +40,13 @@ func main() {
 	grpcClient := service.NewGRPCClient(&config.GRPC, logger)
 	messageRouter := service.NewMessageRouter(grpcClient, connectionManager, logger)
 
+	// 启动gRPC客户端
+	ctx := context.Background()
+	if err := grpcClient.Start(ctx); err != nil {
+		log.Fatalf("启动gRPC客户端失败: %v", err)
+	}
+	logger.Info("gRPC客户端已启动")
+
 	// 创建WebSocket处理器
 	wsHandler := handler.NewWebSocketHandler(connectionManager, grpcClient, messageRouter, jwtManager, logger)
 
@@ -55,7 +62,7 @@ func main() {
 	})
 
 	// WebSocket连接接口
-	router.GET("/ws", wsHandler.HandleWebSocket)
+	router.GET("/", wsHandler.HandleWebSocket)
 
 	// 创建HTTP服务器
 	server := &http.Server{

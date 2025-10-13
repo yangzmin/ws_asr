@@ -11,7 +11,7 @@ import (
 
 // Claims JWT声明结构
 type Claims struct {
-	UserID   string `json:"user_id"`
+	UserID   uint   `json:"user_id"`
 	DeviceID string `json:"device_id"`
 	ClientID string `json:"client_id"`
 	jwt.RegisteredClaims
@@ -69,7 +69,7 @@ func (j *JWTManager) ValidateToken(tokenString string) (*Claims, error) {
 }
 
 // GenerateToken 生成JWT Token（用于测试）
-func (j *JWTManager) GenerateToken(userID, deviceID, clientID string, duration time.Duration) (string, error) {
+func (j *JWTManager) GenerateToken(userID uint, deviceID, clientID string, duration time.Duration) (string, error) {
 	claims := &Claims{
 		UserID:   userID,
 		DeviceID: deviceID,

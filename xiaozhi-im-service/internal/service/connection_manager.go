@@ -5,9 +5,10 @@ import (
 	"sync"
 	"time"
 
+	"xiaozhi-im-service/internal/model"
+
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
-	"xiaozhi-im-service/internal/model"
 )
 
 // Connection WebSocket连接封装
@@ -127,7 +128,7 @@ func (cm *ConnectionManager) GetConnection(connectionID string) (*Connection, bo
 }
 
 // GetConnectionsByUserID 根据用户ID获取连接
-func (cm *ConnectionManager) GetConnectionsByUserID(userID string) []*Connection {
+func (cm *ConnectionManager) GetConnectionsByUserID(userID uint) []*Connection {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
 

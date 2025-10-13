@@ -45,7 +45,7 @@ func LoadConfig() (*Config, error) {
 			ReconnectSeconds: getEnvAsInt("GRPC_RECONNECT_SECONDS", 5),
 		},
 		JWT: JWTConfig{
-			Secret: getEnv("JWT_SECRET", "xiaozhi-im-service-secret"),
+			Secret: getEnv("JWT_SECRET", "abc"),
 		},
 	}
 

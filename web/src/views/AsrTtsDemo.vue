@@ -652,7 +652,8 @@ const connectWebSocket = () => {
   }
   
   // 构建WebSocket URL，通过查询参数传递header信息
-  const baseUrl = 'ws://localhost:8000/'
+  // const baseUrl = 'ws://localhost:8000/'
+  const baseUrl = 'ws://localhost:8081/'
   const params = new URLSearchParams()
   
   // 添加header参数

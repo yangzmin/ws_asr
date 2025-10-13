@@ -14,7 +14,7 @@ type ConnectionInfo struct {
 	SessionID     string            `json:"session_id"`
 	DeviceID      string            `json:"device_id"`
 	ClientID      string            `json:"client_id"`
-	UserID        string            `json:"user_id"`
+	UserID        uint              `json:"user_id"`
 	Headers       map[string]string `json:"headers"`
 	ConnectedAt   time.Time         `json:"connected_at"`
 	LastActiveAt  time.Time         `json:"last_active_at"`
