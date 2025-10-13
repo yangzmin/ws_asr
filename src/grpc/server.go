@@ -24,16 +24,16 @@ import (
 
 // GRPCServer gRPC服务器
 type GRPCServer struct {
-	pb.UnimplementedAIServiceServer
-	config            *configs.Config
-	logger            *utils.Logger
-	server            *grpc.Server
-	poolManager       *pool.PoolManager
-	taskManager       *task.TaskManager
-	userConfigService *services.UserAIConfigService
-	authManager       *auth.AuthManager
-	streams           map[string]*StreamHandler
-	streamsMu         sync.RWMutex
+    pb.UnimplementedAIServiceServer
+    config            *configs.Config
+    logger            *utils.Logger
+    server            *grpc.Server
+    poolManager       *pool.PoolManager
+    taskManager       *task.TaskManager
+    userConfigService services.UserAIConfigService
+    authManager       *auth.AuthManager
+    streams           map[string]*StreamHandler
+    streamsMu         sync.RWMutex
 }
 
 // StreamHandler 流处理器
@@ -49,22 +49,22 @@ type StreamHandler struct {
 
 // NewGRPCServer 创建gRPC服务器
 func NewGRPCServer(
-	config *configs.Config,
-	logger *utils.Logger,
-	poolManager *pool.PoolManager,
-	taskManager *task.TaskManager,
-	userConfigService *services.UserAIConfigService,
-	authManager *auth.AuthManager,
+    config *configs.Config,
+    logger *utils.Logger,
+    poolManager *pool.PoolManager,
+    taskManager *task.TaskManager,
+    userConfigService services.UserAIConfigService,
+    authManager *auth.AuthManager,
 ) *GRPCServer {
-	return &GRPCServer{
-		config:            config,
-		logger:            logger,
-		poolManager:       poolManager,
-		taskManager:       taskManager,
-		userConfigService: userConfigService,
-		authManager:       authManager,
-		streams:           make(map[string]*StreamHandler),
-	}
+    return &GRPCServer{
+        config:            config,
+        logger:            logger,
+        poolManager:       poolManager,
+        taskManager:       taskManager,
+        userConfigService: userConfigService,
+        authManager:       authManager,
+        streams:           make(map[string]*StreamHandler),
+    }
 }
 
 // Start 启动gRPC服务器
@@ -140,33 +140,24 @@ func (s *GRPCServer) Stop() {
 
 // ChatStream 实现双向流聊天接口
 func (s *GRPCServer) ChatStream(stream pb.AIService_ChatStreamServer) error {
-	// 生成连接ID
-	connectionID := fmt.Sprintf("grpc_%d", time.Now().UnixNano())
+    // 生成连接ID
+    connectionID := fmt.Sprintf("grpc_%d", time.Now().UnixNano())
 
 	// 创建上下文
 	ctx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
 
-	// 创建连接处理器
-	handlerFactory := transport.NewDefaultConnectionHandlerFactory(
-		s.config,
-		s.poolManager,
-		s.taskManager,
-		s.logger,
-		s.userConfigService,
-	)
+    // gRPC 适配暂未直接接入 ConnectionHandler，后续可在此创建适配的连接并传入处理器
 
-	handler := handlerFactory.CreateHandler(connectionID, "grpc")
-
-	// 创建流处理器
-	streamHandler := &StreamHandler{
-		stream:       stream,
-		connectionID: connectionID,
-		handler:      handler,
-		ctx:          ctx,
-		cancel:       cancel,
-		lastActive:   time.Now(),
-	}
+    // 创建流处理器
+    streamHandler := &StreamHandler{
+        stream:       stream,
+        connectionID: connectionID,
+        handler:      nil,
+        ctx:          ctx,
+        cancel:       cancel,
+        lastActive:   time.Now(),
+    }
 
 	// 注册流处理器
 	s.streamsMu.Lock()
@@ -268,17 +259,17 @@ func (s *GRPCServer) handleOutgoingMessages(streamHandler *StreamHandler) error 
 
 // processGRPCRequest 处理gRPC请求
 func (s *GRPCServer) processGRPCRequest(streamHandler *StreamHandler, req *pb.ChatRequest) error {
-	// 将gRPC请求转换为内部消息格式
-	message, err := s.convertGRPCRequestToMessage(req)
-	if err != nil {
-		return fmt.Errorf("转换gRPC请求失败: %v", err)
-	}
+    // 将gRPC请求转换为内部消息格式
+    _, err := s.convertGRPCRequestToMessage(req)
+    if err != nil {
+        return fmt.Errorf("转换gRPC请求失败: %v", err)
+    }
 
 	// 调用连接处理器处理消息
 	// 这里需要适配现有的连接处理器接口
 	// 由于现有处理器是基于WebSocket设计的，需要进行适配
 	
-	s.logger.Debug("处理gRPC消息: %s, 类型: %T", streamHandler.connectionID, req.Message)
+    s.logger.Debug("处理gRPC消息: %s, 类型: %v", streamHandler.connectionID, req.MessageType)
 	
 	// TODO: 实现具体的消息处理逻辑
 	// 这需要根据现有的连接处理器实现进行适配
@@ -288,15 +279,15 @@ func (s *GRPCServer) processGRPCRequest(streamHandler *StreamHandler, req *pb.Ch
 
 // convertGRPCRequestToMessage 转换gRPC请求为内部消息格式
 func (s *GRPCServer) convertGRPCRequestToMessage(req *pb.ChatRequest) (interface{}, error) {
-	switch msg := req.Message.(type) {
-	case *pb.ChatRequest_Hello:
-		return map[string]interface{}{
-			"type": "hello",
-			"data": map[string]interface{}{
-				"audio_params": s.convertAudioParams(msg.Hello.AudioParams),
-			},
-			"timestamp": req.Timestamp,
-		}, nil
+    switch msg := req.Content.(type) {
+    case *pb.ChatRequest_Hello:
+        return map[string]interface{}{
+            "type": "hello",
+            "data": map[string]interface{}{
+                "audio_params": s.convertAudioParams(msg.Hello.AudioParams),
+            },
+            "timestamp": req.Timestamp,
+        }, nil
 
 	case *pb.ChatRequest_Listen:
 		return map[string]interface{}{
@@ -398,15 +389,16 @@ func (s *GRPCServer) convertImageData(data *pb.ImageData) map[string]interface{}
 
 // sendErrorResponse 发送错误响应
 func (s *GRPCServer) sendErrorResponse(streamHandler *StreamHandler, errorCode, errorMessage string) {
-	resp := &pb.ChatResponse{
-		Timestamp: time.Now().UnixNano() / int64(time.Millisecond),
-		Response: &pb.ChatResponse_ErrorResponse{
-			ErrorResponse: &pb.ErrorResponse{
-				ErrorCode:    errorCode,
-				ErrorMessage: errorMessage,
-			},
-		},
-	}
+    resp := &pb.ChatResponse{
+        ResponseType: pb.ResponseType_RESPONSE_TYPE_ERROR,
+        Timestamp: time.Now().UnixNano() / int64(time.Millisecond),
+        Content: &pb.ChatResponse_ErrorResponse{
+            ErrorResponse: &pb.ErrorResponse{
+                ErrorCode:    errorCode,
+                ErrorMessage: errorMessage,
+            },
+        },
+    }
 
 	if err := streamHandler.stream.Send(resp); err != nil {
 		s.logger.Error("发送错误响应失败: %v", err)
@@ -415,9 +407,9 @@ func (s *GRPCServer) sendErrorResponse(streamHandler *StreamHandler, errorCode, 
 
 // HealthCheck 实现健康检查接口
 func (s *GRPCServer) HealthCheck(ctx context.Context, req *pb.HealthCheckRequest) (*pb.HealthCheckResponse, error) {
-	return &pb.HealthCheckResponse{
-		Status: "SERVING",
-	}, nil
+    return &pb.HealthCheckResponse{
+        Status: pb.HealthCheckResponse_SERVING,
+    }, nil
 }
 
 // cleanupInactiveStreams 清理不活跃的流

@@ -13,38 +13,35 @@ import (
 	"xiaozhi-im-service/internal/config"
 	"xiaozhi-im-service/internal/handler"
 	"xiaozhi-im-service/internal/service"
+	"xiaozhi-im-service/pkg/auth"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func main() {
 	// 加载配置
-	cfg, err := config.LoadConfig()
+	config, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("加载配置失败: %v", err)
 	}
 
-	// 设置Gin模式
-	if cfg.Server.Debug {
-		gin.SetMode(gin.DebugMode)
-	} else {
-		gin.SetMode(gin.ReleaseMode)
+	// 初始化日志
+	logger := logrus.New()
+	if config.Server.Debug {
+		logger.SetLevel(logrus.DebugLevel)
 	}
 
-	// 创建连接管理服务
-	connectionService := service.NewConnectionService(cfg)
+	// 创建JWT管理器
+	jwtManager := auth.NewJWTManager(config.JWT.Secret)
 
-	// 创建gRPC客户端服务
-	grpcClientService, err := service.NewGRPCClientService(cfg)
-	if err != nil {
-		log.Fatalf("创建gRPC客户端服务失败: %v", err)
-	}
-
-	// 创建消息路由服务
-	messageService := service.NewMessageService(cfg, grpcClientService)
+	// 创建服务实例
+	connectionManager := service.NewConnectionManager(logger)
+	grpcClient := service.NewGRPCClient(&config.GRPC, logger)
+	messageRouter := service.NewMessageRouter(grpcClient, connectionManager, logger)
 
 	// 创建WebSocket处理器
-	wsHandler := handler.NewWebSocketHandler(cfg, connectionService, messageService)
+	wsHandler := handler.NewWebSocketHandler(connectionManager, grpcClient, messageRouter, jwtManager, logger)
 
 	// 创建Gin路由
 	router := gin.Default()
@@ -62,13 +59,13 @@ func main() {
 
 	// 创建HTTP服务器
 	server := &http.Server{
-		Addr:    fmt.Sprintf(":%d", cfg.Server.Port),
+		Addr:    fmt.Sprintf(":%d", config.Server.Port),
 		Handler: router,
 	}
 
 	// 启动服务器
 	go func() {
-		log.Printf("IM服务启动在端口 %d", cfg.Server.Port)
+		log.Printf("IM服务启动在端口 %d", config.Server.Port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("服务器启动失败: %v", err)
 		}
@@ -86,7 +83,7 @@ func main() {
 	defer cancel()
 
 	// 关闭gRPC连接
-	grpcClientService.Close()
+	grpcClient.Stop()
 
 	// 关闭HTTP服务器
 	if err := server.Shutdown(ctx); err != nil {

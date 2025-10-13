@@ -204,7 +204,7 @@ func (mr *MessageRouter) convertWebSocketToGRPC(wsMsg *model.WebSocketMessage) (
 			}
 		}
 
-		req.Message = &pb.ChatRequest_Hello{
+		req.Content = &pb.ChatRequest_Hello{
 			Hello: &pb.HelloMessage{
 				AudioParams: mr.convertAudioParams(helloMsg.AudioParams),
 			},
@@ -216,7 +216,7 @@ func (mr *MessageRouter) convertWebSocketToGRPC(wsMsg *model.WebSocketMessage) (
 			return nil, fmt.Errorf("解析listen消息失败: %v", err)
 		}
 
-		req.Message = &pb.ChatRequest_Listen{
+		req.Content = &pb.ChatRequest_Listen{
 			Listen: &pb.ListenMessage{
 				State: listenMsg.State,
 				Mode:  listenMsg.Mode,
@@ -230,7 +230,7 @@ func (mr *MessageRouter) convertWebSocketToGRPC(wsMsg *model.WebSocketMessage) (
 			return nil, fmt.Errorf("解析chat消息失败: %v", err)
 		}
 
-		req.Message = &pb.ChatRequest_Chat{
+		req.Content = &pb.ChatRequest_Chat{
 			Chat: &pb.ChatMessage{
 				Text: chatMsg.Text,
 			},
@@ -244,7 +244,7 @@ func (mr *MessageRouter) convertWebSocketToGRPC(wsMsg *model.WebSocketMessage) (
 			}
 		}
 
-		req.Message = &pb.ChatRequest_Abort{
+		req.Content = &pb.ChatRequest_Abort{
 			Abort: &pb.AbortMessage{
 				Reason: abortMsg.Reason,
 			},
@@ -256,7 +256,7 @@ func (mr *MessageRouter) convertWebSocketToGRPC(wsMsg *model.WebSocketMessage) (
 			return nil, fmt.Errorf("解析vision消息失败: %v", err)
 		}
 
-		req.Message = &pb.ChatRequest_Vision{
+		req.Content = &pb.ChatRequest_Vision{
 			Vision: &pb.VisionMessage{
 				Cmd:    visionMsg.Cmd,
 				Params: visionMsg.Params,
@@ -269,7 +269,7 @@ func (mr *MessageRouter) convertWebSocketToGRPC(wsMsg *model.WebSocketMessage) (
 			return nil, fmt.Errorf("解析image消息失败: %v", err)
 		}
 
-		req.Message = &pb.ChatRequest_Image{
+		req.Content = &pb.ChatRequest_Image{
 			Image: &pb.ImageMessage{
 				Text:      imageMsg.Text,
 				ImageData: mr.convertImageData(imageMsg.ImageData),
@@ -282,7 +282,7 @@ func (mr *MessageRouter) convertWebSocketToGRPC(wsMsg *model.WebSocketMessage) (
 			return nil, fmt.Errorf("解析mcp消息失败: %v", err)
 		}
 
-		req.Message = &pb.ChatRequest_Mcp{
+		req.Content = &pb.ChatRequest_Mcp{
 			Mcp: &pb.MCPMessage{
 				Method: mcpMsg.Method,
 				Params: mcpMsg.Params,
@@ -296,7 +296,7 @@ func (mr *MessageRouter) convertWebSocketToGRPC(wsMsg *model.WebSocketMessage) (
 			return nil, fmt.Errorf("无效的音频数据")
 		}
 
-		req.Message = &pb.ChatRequest_Audio{
+		req.Content = &pb.ChatRequest_Audio{
 			Audio: &pb.AudioData{
 				Data: audioData,
 			},
@@ -316,7 +316,7 @@ func (mr *MessageRouter) convertGRPCToWebSocket(grpcResp *pb.ChatResponse) (*mod
 		Data:      make(map[string]interface{}),
 	}
 
-	switch resp := grpcResp.Response.(type) {
+	switch resp := grpcResp.Content.(type) {
 	case *pb.ChatResponse_HelloResponse:
 		wsMsg.Type = "hello_response"
 		wsMsg.Data["server_audio_params"] = mr.convertAudioParamsFromPB(resp.HelloResponse.ServerAudioParams)
