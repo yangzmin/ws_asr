@@ -13,5 +13,9 @@ config.db
 /ota_bin
 /web/node_modules
 /web/pkg
+!/web/pkg/.keep
+# 忽略 Go 模块缓存，避免被 go 工具扫描
+/web/pkg/mod/
+!/web/pkg/mod/.keep
 /_build
 /.vscode

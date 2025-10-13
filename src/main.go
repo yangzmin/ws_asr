@@ -26,6 +26,7 @@ import (
 	"xiaozhi-server-go/src/core/utils"
 	"xiaozhi-server-go/src/device"
 	_ "xiaozhi-server-go/src/docs"
+	"xiaozhi-server-go/src/grpc"
 	"xiaozhi-server-go/src/handlers"
 	"xiaozhi-server-go/src/ota"
 	"xiaozhi-server-go/src/services"
@@ -284,6 +285,62 @@ func StartHttpServer(config *configs.Config, logger *utils.Logger, g *errgroup.G
 	return httpServer, nil
 }
 
+// StartGRPCServer 启动gRPC服务器
+func StartGRPCServer(
+	config *configs.Config,
+	logger *utils.Logger,
+	authManager *auth.AuthManager,
+	g *errgroup.Group,
+	groupCtx context.Context,
+	db *gorm.DB,
+) error {
+	// 初始化资源池管理器
+	poolManager, err := pool.NewPoolManager(config, logger)
+	if err != nil {
+		return fmt.Errorf("初始化资源池管理器失败: %v", err)
+	}
+
+	// 初始化任务管理器
+	taskMgr := task.NewTaskManager(task.ResourceConfig{
+		MaxWorkers:        12,
+		MaxTasksPerClient: 20,
+	})
+	taskMgr.Start()
+
+	userConfigService := services.NewUserAIConfigService(db, logger)
+
+	// 创建gRPC服务器
+	grpcServer := grpc.NewGRPCServer(
+		config,
+		logger,
+		poolManager,
+		taskMgr,
+		userConfigService,
+		authManager,
+	)
+
+	// 启动gRPC服务器
+	g.Go(func() error {
+		// 从配置中获取gRPC端口，如果没有配置则使用默认端口9090
+		grpcPort := 9090
+		if config.Transport.GRPC.Port > 0 {
+			grpcPort = config.Transport.GRPC.Port
+		}
+
+		if err := grpcServer.Start(groupCtx, grpcPort); err != nil {
+			if groupCtx.Err() != nil {
+				return nil // 正常关闭
+			}
+			logger.Error("gRPC服务器运行失败: %v", err)
+			return err
+		}
+		return nil
+	})
+
+	logger.Info("gRPC服务器已启动")
+	return nil
+}
+
 func GracefulShutdown(cancel context.CancelFunc, logger *utils.Logger, g *errgroup.Group) {
 	// 监听系统信号
 	sigChan := make(chan os.Signal, 1)
@@ -325,8 +382,14 @@ func startServices(
 	db *gorm.DB,
 ) error {
 	// 启动传输层服务
-	if _, err := StartTransportServer(config, logger, authManager, g, groupCtx, db); err != nil {
+	transportManager, err := StartTransportServer(config, logger, authManager, g, groupCtx, db)
+	if err != nil {
 		return fmt.Errorf("启动传输层服务失败: %w", err)
+	}
+
+	// 启动gRPC服务
+	if err := StartGRPCServer(config, logger, authManager, g, groupCtx, db); err != nil {
+		return fmt.Errorf("启动gRPC服务失败: %w", err)
 	}
 
 	// 启动 Http 服务
@@ -334,6 +397,7 @@ func startServices(
 		return fmt.Errorf("启动 Http 服务失败: %w", err)
 	}
 
+	_ = transportManager // 避免未使用变量警告
 	return nil
 }
 

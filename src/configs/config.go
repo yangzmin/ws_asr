@@ -70,6 +70,11 @@ type Config struct {
 			IP      string `yaml:"ip" json:"ip"`
 			Port    int    `yaml:"port" json:"port"`
 		} `yaml:"websocket" json:"websocket"`
+		GRPC struct {
+			Enabled bool   `yaml:"enabled" json:"enabled"`
+			IP      string `yaml:"ip" json:"ip"`
+			Port    int    `yaml:"port" json:"port"`
+		} `yaml:"grpc" json:"grpc"`
 	} `yaml:"transport" json:"transport"`
 
 	Log struct {
