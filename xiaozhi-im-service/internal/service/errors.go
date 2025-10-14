@@ -12,6 +12,7 @@ var (
 	ErrGRPCClientNotReady = errors.New("gRPC客户端未就绪")
 	ErrGRPCStreamClosed   = errors.New("gRPC流已关闭")
 	ErrGRPCConnectionFail = errors.New("gRPC连接失败")
+	ErrNotConnected       = errors.New("未连接到gRPC服务")
 
 	// 消息相关错误
 	ErrInvalidMessageType   = errors.New("无效的消息类型")

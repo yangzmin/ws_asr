@@ -5,42 +5,43 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"sync"
 	"time"
+
+	pb "xiaozhi-grpc-proto/generated/go/ai_service"
+	"xiaozhi-server-go/src/configs"
+	"xiaozhi-server-go/src/core"
+	"xiaozhi-server-go/src/core/auth"
+	"xiaozhi-server-go/src/core/pool"
+	"xiaozhi-server-go/src/core/utils"
+	"xiaozhi-server-go/src/services"
+	"xiaozhi-server-go/src/task"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
-
-	pb "xiaozhi-grpc-proto/generated/go/ai_service"
-	"xiaozhi-server-go/src/configs"
-	"xiaozhi-server-go/src/core/auth"
-	"xiaozhi-server-go/src/core/pool"
-	"xiaozhi-server-go/src/core/transport"
-	"xiaozhi-server-go/src/core/utils"
-	"xiaozhi-server-go/src/services"
-	"xiaozhi-server-go/src/task"
 )
 
 // GRPCServer gRPC服务器
 type GRPCServer struct {
-    pb.UnimplementedAIServiceServer
-    config            *configs.Config
-    logger            *utils.Logger
-    server            *grpc.Server
-    poolManager       *pool.PoolManager
-    taskManager       *task.TaskManager
-    userConfigService services.UserAIConfigService
-    authManager       *auth.AuthManager
-    streams           map[string]*StreamHandler
-    streamsMu         sync.RWMutex
+	pb.UnimplementedAIServiceServer
+	config            *configs.Config
+	logger            *utils.Logger
+	server            *grpc.Server
+	poolManager       *pool.PoolManager
+	taskManager       *task.TaskManager
+	userConfigService services.UserAIConfigService
+	authManager       *auth.AuthManager
+	streams           map[string]*StreamHandler
+	streamsMu         sync.RWMutex
 }
 
 // StreamHandler 流处理器
 type StreamHandler struct {
 	stream       pb.AIService_ChatStreamServer
 	connectionID string
-	handler      transport.ConnectionHandler
+	handler      *core.ConnectionHandler
 	ctx          context.Context
 	cancel       context.CancelFunc
 	mu           sync.RWMutex
@@ -49,22 +50,22 @@ type StreamHandler struct {
 
 // NewGRPCServer 创建gRPC服务器
 func NewGRPCServer(
-    config *configs.Config,
-    logger *utils.Logger,
-    poolManager *pool.PoolManager,
-    taskManager *task.TaskManager,
-    userConfigService services.UserAIConfigService,
-    authManager *auth.AuthManager,
+	config *configs.Config,
+	logger *utils.Logger,
+	poolManager *pool.PoolManager,
+	taskManager *task.TaskManager,
+	userConfigService services.UserAIConfigService,
+	authManager *auth.AuthManager,
 ) *GRPCServer {
-    return &GRPCServer{
-        config:            config,
-        logger:            logger,
-        poolManager:       poolManager,
-        taskManager:       taskManager,
-        userConfigService: userConfigService,
-        authManager:       authManager,
-        streams:           make(map[string]*StreamHandler),
-    }
+	return &GRPCServer{
+		config:            config,
+		logger:            logger,
+		poolManager:       poolManager,
+		taskManager:       taskManager,
+		userConfigService: userConfigService,
+		authManager:       authManager,
+		streams:           make(map[string]*StreamHandler),
+	}
 }
 
 // Start 启动gRPC服务器
@@ -140,24 +141,24 @@ func (s *GRPCServer) Stop() {
 
 // ChatStream 实现双向流聊天接口
 func (s *GRPCServer) ChatStream(stream pb.AIService_ChatStreamServer) error {
-    // 生成连接ID
-    connectionID := fmt.Sprintf("grpc_%d", time.Now().UnixNano())
+	// 生成连接ID
+	connectionID := fmt.Sprintf("grpc_%d", time.Now().UnixNano())
 
 	// 创建上下文
 	ctx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
 
-    // gRPC 适配暂未直接接入 ConnectionHandler，后续可在此创建适配的连接并传入处理器
+	// gRPC 适配暂未直接接入 ConnectionHandler，后续可在此创建适配的连接并传入处理器
 
-    // 创建流处理器
-    streamHandler := &StreamHandler{
-        stream:       stream,
-        connectionID: connectionID,
-        handler:      nil,
-        ctx:          ctx,
-        cancel:       cancel,
-        lastActive:   time.Now(),
-    }
+	// 创建流处理器
+	streamHandler := &StreamHandler{
+		stream:       stream,
+		connectionID: connectionID,
+		handler:      nil,
+		ctx:          ctx,
+		cancel:       cancel,
+		lastActive:   time.Now(),
+	}
 
 	// 注册流处理器
 	s.streamsMu.Lock()
@@ -200,216 +201,149 @@ func (s *GRPCServer) ChatStream(stream pb.AIService_ChatStreamServer) error {
 }
 
 // handleIncomingMessages 处理接收到的消息
+// 修复handleIncomingMessages方法中的processGRPCRequest调用
 func (s *GRPCServer) handleIncomingMessages(streamHandler *StreamHandler) error {
 	for {
 		select {
 		case <-streamHandler.ctx.Done():
 			return streamHandler.ctx.Err()
 		default:
-			// 接收消息
 			req, err := streamHandler.stream.Recv()
 			if err != nil {
 				if err == io.EOF {
-					s.logger.Info("gRPC流客户端关闭: %s", streamHandler.connectionID)
-					return err
+					return nil
 				}
-				s.logger.Error("接收gRPC消息失败: %v", err)
-				return err
+				return fmt.Errorf("接收消息失败: %v", err)
 			}
 
-			// 更新活跃时间
-			streamHandler.mu.Lock()
+			// 更新最后活跃时间
 			streamHandler.lastActive = time.Now()
-			streamHandler.mu.Unlock()
-
-			// 转换并处理消息
-			if err := s.processGRPCRequest(streamHandler, req); err != nil {
+			// 处理消息 - 修复参数传递
+			if err := s.processGRPCRequest(streamHandler, int(req.MessageType), req.MessageData); err != nil {
 				s.logger.Error("处理gRPC请求失败: %v", err)
-				// 发送错误响应
 				s.sendErrorResponse(streamHandler, "PROCESS_ERROR", err.Error())
 			}
 		}
 	}
 }
 
-// handleOutgoingMessages 处理发送消息
-func (s *GRPCServer) handleOutgoingMessages(streamHandler *StreamHandler) error {
-	// 这里需要实现从连接处理器获取响应消息的逻辑
-	// 由于现有架构中连接处理器是基于WebSocket设计的，
-	// 我们需要适配到gRPC流
+// 修复processGRPCRequest方法中的NewConnectionHandler调用参数
+func (s *GRPCServer) processGRPCRequest(streamHandler *StreamHandler, messageType int, message []byte) error {
+	// 创建连接适配器
+	adapter := NewGRPCConnectionAdapter(streamHandler.stream, streamHandler.connectionID)
+
+	// 创建模拟的HTTP请求
+	req, err := http.NewRequest("POST", "/grpc", nil)
+	if err != nil {
+		return fmt.Errorf("创建HTTP请求失败: %v", err)
+	}
+
+	// 获取提供者集合
+	providerSet, err := s.poolManager.GetProviderSet()
+	if err != nil {
+		return fmt.Errorf("获取提供者集合失败: %v", err)
+	}
+
+	// 创建连接处理器 - 修复参数顺序
+	handler := core.NewConnectionHandler(
+		s.config,
+		providerSet,
+		s.logger,
+		req,
+		context.Background(),
+	)
+	fmt.Println("processGRPCRequest 接收message", string(message))
+
+	// 将消息放入适配器的消息队列
+	if err := adapter.PutMessage(messageType, message); err != nil {
+		return fmt.Errorf("消息放入队列失败: %v", err)
+	}
+
+	// 启动消息处理协程
+	go handler.Handle(adapter)
 	
-	// 创建一个通道来接收响应消息
-	responseCh := make(chan *pb.ChatResponse, 100)
-	
-	// 注册响应处理器到连接处理器
-	// 这需要修改现有的连接处理器接口
-	
+	// 启动响应处理协程
+	go s.handleConnectionResponses(streamHandler, adapter)
+
+	return nil
+}
+
+// handleConnectionResponses 处理连接处理器的响应 - 新增方法
+func (s *GRPCServer) handleConnectionResponses(streamHandler *StreamHandler, adapter *GRPCConnectionAdapter) {
+	defer func() {
+		if r := recover(); r != nil {
+			s.logger.Error("处理连接响应时发生panic: %v", r)
+		}
+	}()
+
 	for {
 		select {
 		case <-streamHandler.ctx.Done():
-			return streamHandler.ctx.Err()
-		case resp := <-responseCh:
-			if err := streamHandler.stream.Send(resp); err != nil {
-				s.logger.Error("发送gRPC响应失败: %v", err)
-				return err
-			}
+			s.logger.Info("流上下文已取消，停止响应处理")
+			return
+		case <-adapter.stopChan:
+			s.logger.Info("适配器已关闭，停止响应处理")
+			return
+		default:
+			// 由于现有的ConnectionHandler是通过WriteMessage直接发送响应的，
+			// 我们不需要额外的响应处理逻辑，适配器会直接通过stream.Send发送
+			// 这里只需要保持协程活跃，监听上下文取消
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
 }
 
-// processGRPCRequest 处理gRPC请求
-func (s *GRPCServer) processGRPCRequest(streamHandler *StreamHandler, req *pb.ChatRequest) error {
-    // 将gRPC请求转换为内部消息格式
-    _, err := s.convertGRPCRequestToMessage(req)
-    if err != nil {
-        return fmt.Errorf("转换gRPC请求失败: %v", err)
-    }
-
-	// 调用连接处理器处理消息
-	// 这里需要适配现有的连接处理器接口
-	// 由于现有处理器是基于WebSocket设计的，需要进行适配
+// handleOutgoingMessages 处理发送消息 - 重构后的方法
+func (s *GRPCServer) handleOutgoingMessages(streamHandler *StreamHandler) error {
+	// 现在这个方法主要用于处理流的生命周期管理
+	// 实际的消息发送已经通过GRPCConnectionAdapter的WriteMessage方法处理
 	
-    s.logger.Debug("处理gRPC消息: %s, 类型: %v", streamHandler.connectionID, req.MessageType)
+	s.logger.Info("开始处理gRPC流的输出消息")
 	
-	// TODO: 实现具体的消息处理逻辑
-	// 这需要根据现有的连接处理器实现进行适配
+	// 等待流上下文结束
+	<-streamHandler.ctx.Done()
 	
-	return nil
+	s.logger.Info("gRPC流上下文已结束，停止处理输出消息")
+	return streamHandler.ctx.Err()
 }
 
-// convertGRPCRequestToMessage 转换gRPC请求为内部消息格式
+// convertGRPCRequestToMessage 转换gRPC请求为消息
 func (s *GRPCServer) convertGRPCRequestToMessage(req *pb.ChatRequest) (interface{}, error) {
-    switch msg := req.Content.(type) {
-    case *pb.ChatRequest_Hello:
-        return map[string]interface{}{
-            "type": "hello",
-            "data": map[string]interface{}{
-                "audio_params": s.convertAudioParams(msg.Hello.AudioParams),
-            },
-            "timestamp": req.Timestamp,
-        }, nil
-
-	case *pb.ChatRequest_Listen:
+	// 根据消息类型转换请求
+	switch req.MessageType {
+	case 1: // 文本消息
 		return map[string]interface{}{
-			"type": "listen",
-			"data": map[string]interface{}{
-				"state": msg.Listen.State,
-				"mode":  msg.Listen.Mode,
-				"text":  msg.Listen.Text,
-			},
-			"timestamp": req.Timestamp,
+			"type":    "text",
+			"content": string(req.MessageData),
 		}, nil
-
-	case *pb.ChatRequest_Chat:
+	case 2: // 二进制消息（如音频）
 		return map[string]interface{}{
-			"type": "chat",
-			"data": map[string]interface{}{
-				"text": msg.Chat.Text,
-			},
-			"timestamp": req.Timestamp,
+			"type": "binary",
+			"data": req.MessageData,
 		}, nil
-
-	case *pb.ChatRequest_Abort:
-		return map[string]interface{}{
-			"type": "abort",
-			"data": map[string]interface{}{
-				"reason": msg.Abort.Reason,
-			},
-			"timestamp": req.Timestamp,
-		}, nil
-
-	case *pb.ChatRequest_Vision:
-		return map[string]interface{}{
-			"type": "vision",
-			"data": map[string]interface{}{
-				"cmd":    msg.Vision.Cmd,
-				"params": msg.Vision.Params,
-			},
-			"timestamp": req.Timestamp,
-		}, nil
-
-	case *pb.ChatRequest_Image:
-		return map[string]interface{}{
-			"type": "image",
-			"data": map[string]interface{}{
-				"text":       msg.Image.Text,
-				"image_data": s.convertImageData(msg.Image.ImageData),
-			},
-			"timestamp": req.Timestamp,
-		}, nil
-
-	case *pb.ChatRequest_Mcp:
-		return map[string]interface{}{
-			"type": "mcp",
-			"data": map[string]interface{}{
-				"method": msg.Mcp.Method,
-				"params": msg.Mcp.Params,
-			},
-			"timestamp": req.Timestamp,
-		}, nil
-
-	case *pb.ChatRequest_Audio:
-		return map[string]interface{}{
-			"type": "audio",
-			"data": map[string]interface{}{
-				"audio_data": msg.Audio.Data,
-			},
-			"timestamp": req.Timestamp,
-		}, nil
-
 	default:
-		return nil, fmt.Errorf("不支持的消息类型: %T", msg)
-	}
-}
-
-// convertAudioParams 转换音频参数
-func (s *GRPCServer) convertAudioParams(params *pb.AudioParams) map[string]interface{} {
-	if params == nil {
-		return nil
-	}
-	return map[string]interface{}{
-		"format":         params.Format,
-		"sample_rate":    params.SampleRate,
-		"channels":       params.Channels,
-		"frame_duration": params.FrameDuration,
-	}
-}
-
-// convertImageData 转换图片数据
-func (s *GRPCServer) convertImageData(data *pb.ImageData) map[string]interface{} {
-	if data == nil {
-		return nil
-	}
-	return map[string]interface{}{
-		"url":    data.Url,
-		"data":   data.Data,
-		"format": data.Format,
+		return nil, fmt.Errorf("不支持的消息类型: %d", req.MessageType)
 	}
 }
 
 // sendErrorResponse 发送错误响应
 func (s *GRPCServer) sendErrorResponse(streamHandler *StreamHandler, errorCode, errorMessage string) {
-    resp := &pb.ChatResponse{
-        ResponseType: pb.ResponseType_RESPONSE_TYPE_ERROR,
-        Timestamp: time.Now().UnixNano() / int64(time.Millisecond),
-        Content: &pb.ChatResponse_ErrorResponse{
-            ErrorResponse: &pb.ErrorResponse{
-                ErrorCode:    errorCode,
-                ErrorMessage: errorMessage,
-            },
-        },
-    }
+	errorResp := &pb.ChatResponse{
+		ResponseType: 999, // 错误响应类型
+		ResponseData: []byte(fmt.Sprintf(`{"error_code": "%s", "error_message": "%s"}`, errorCode, errorMessage)),
+		Timestamp:    time.Now().UnixNano() / int64(time.Millisecond),
+	}
 
-	if err := streamHandler.stream.Send(resp); err != nil {
+	if err := streamHandler.stream.Send(errorResp); err != nil {
 		s.logger.Error("发送错误响应失败: %v", err)
 	}
 }
 
 // HealthCheck 实现健康检查接口
 func (s *GRPCServer) HealthCheck(ctx context.Context, req *pb.HealthCheckRequest) (*pb.HealthCheckResponse, error) {
-    return &pb.HealthCheckResponse{
-        Status: pb.HealthCheckResponse_SERVING,
-    }, nil
+	return &pb.HealthCheckResponse{
+		Status: pb.HealthCheckResponse_SERVING,
+	}, nil
 }
 
 // cleanupInactiveStreams 清理不活跃的流

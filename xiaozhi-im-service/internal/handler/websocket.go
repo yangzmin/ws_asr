@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -17,12 +18,12 @@ import (
 
 // WebSocketHandler WebSocket处理器
 type WebSocketHandler struct {
-	upgrader    websocket.Upgrader
-	connMgr     *service.ConnectionManager
-	grpcClient  *service.GRPCClient
-	msgRouter   *service.MessageRouter
-	jwtManager  *auth.JWTManager
-	logger      *logrus.Logger
+	upgrader   websocket.Upgrader
+	connMgr    *service.ConnectionManager
+	grpcClient *service.GRPCClient
+	msgRouter  *service.MessageRouter
+	jwtManager *auth.JWTManager
+	logger     *logrus.Logger
 }
 
 // NewWebSocketHandler 创建WebSocket处理器
@@ -39,8 +40,8 @@ func NewWebSocketHandler(
 				// 在生产环境中应该检查Origin
 				return true
 			},
-			ReadBufferSize:  1024 * 4,  // 4KB
-			WriteBufferSize: 1024 * 4,  // 4KB
+			ReadBufferSize:  1024 * 4, // 4KB
+			WriteBufferSize: 1024 * 4, // 4KB
 		},
 		connMgr:    connMgr,
 		grpcClient: grpcClient,
@@ -155,8 +156,9 @@ func (h *WebSocketHandler) readPump(conn *service.Connection) {
 		case <-conn.CloseCh:
 			return
 		default:
-			// 读取消息
-			_, message, err := conn.Conn.ReadMessage()
+			// 读取消息，获取消息类型
+			messageType, message, err := conn.Conn.ReadMessage()
+			fmt.Println("读取到消息:", string(message), messageType)
 			if err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 					h.logger.WithFields(logrus.Fields{
@@ -170,34 +172,80 @@ func (h *WebSocketHandler) readPump(conn *service.Connection) {
 			// 更新活跃时间
 			conn.UpdateLastActive()
 
-			// 解析消息
-			var wsMsg model.WebSocketMessage
-			if err := json.Unmarshal(message, &wsMsg); err != nil {
+			// 根据消息类型处理
+			switch messageType {
+			case websocket.TextMessage:
+				// 处理文本消息（JSON格式）
+				if err := h.msgRouter.RouteWebSocketMessage(conn.ID, message); err != nil {
+					h.logger.WithError(err).Error("处理文本消息失败")
+				}
+			case websocket.BinaryMessage:
+				// 处理二进制消息（音频数据）
+				if err := h.handleBinaryMessage(conn.Conn, conn.ID, message); err != nil {
+					h.logger.WithError(err).Error("处理二进制消息失败")
+				}
+			default:
 				h.logger.WithFields(logrus.Fields{
 					"connection_id": conn.ID,
-					"error":         err,
-					"message":       string(message),
-				}).Error("消息解析失败")
-				h.sendErrorMessage(conn, "PARSE_ERROR", "消息格式错误")
-				continue
-			}
-
-			// 设置时间戳
-			if wsMsg.Timestamp == 0 {
-				wsMsg.Timestamp = time.Now().UnixNano() / int64(time.Millisecond)
-			}
-
-			// 路由消息到gRPC
-			if err := h.msgRouter.RouteWebSocketMessage(conn.ID, &wsMsg); err != nil {
-				h.logger.WithFields(logrus.Fields{
-					"connection_id": conn.ID,
-					"message_type":  wsMsg.Type,
-					"error":         err,
-				}).Error("消息路由失败")
-				h.sendErrorMessage(conn, "ROUTE_ERROR", "消息处理失败")
+					"message_type":  messageType,
+				}).Warn("不支持的消息类型")
 			}
 		}
 	}
+}
+
+// handleTextMessage 处理文本消息
+func (h *WebSocketHandler) handleTextMessage(conn *websocket.Conn, connectionID string, data []byte) error {
+	// 解析JSON消息
+	// var msgJSON interface{}
+	// if err := json.Unmarshal(data, &msgJSON); err != nil {
+	// 	return conn.WriteMessage(1, data)
+	// }
+
+	// // 检查是否为整数类型
+	// if _, ok := msgJSON.(float64); ok {
+	// 	return conn.WriteMessage(1, data)
+	// }
+
+	// // 解析为map类型处理具体消息
+	// msgMap, ok := msgJSON.(map[string]interface{})
+	// if !ok {
+	// 	return fmt.Errorf("消息格式错误")
+	// }
+
+	// 解析WebSocket消息
+	// var msg model.WebSocketMessage
+	// if err := json.Unmarshal(data, &msg); err != nil {
+	// 	h.logger.WithError(err).Error("解析WebSocket消息失败")
+	// 	return err
+	// }
+
+	// 设置时间戳
+	// msg.Timestamp = time.Now().UnixNano() / int64(time.Millisecond)
+
+	// 路由消息到gRPC
+	if err := h.msgRouter.RouteWebSocketMessage(connectionID, data); err != nil {
+		h.logger.WithError(err).Error("路由WebSocket消息失败")
+		return err
+	}
+
+	return nil
+}
+
+// handleBinaryMessage 处理二进制消息（音频数据）
+func (h *WebSocketHandler) handleBinaryMessage(conn *websocket.Conn, connectionID string, data []byte) error {
+	h.logger.WithFields(logrus.Fields{
+		"connection_id": connectionID,
+		"data_size":     len(data),
+	}).Debug("接收到二进制音频数据")
+
+	// 直接路由音频数据到gRPC
+	if err := h.msgRouter.RouteBinaryMessage(connectionID, data); err != nil {
+		h.logger.WithError(err).Error("路由二进制音频数据失败")
+		return err
+	}
+
+	return nil
 }
 
 // writePump 写入消息
@@ -213,6 +261,7 @@ func (h *WebSocketHandler) writePump(conn *service.Connection) {
 		case <-conn.CloseCh:
 			return
 		case message, ok := <-conn.SendCh:
+			fmt.Println("messagemessagemessageconn.SendCh", message)
 			conn.Conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 			if !ok {
 				conn.Conn.WriteMessage(websocket.CloseMessage, []byte{})

@@ -25,22 +25,13 @@ message ChatRequest {
   string client_id = 3;
   
   // 消息类型
-  MessageType message_type = 4;
+  int32 message_type = 4;
   
-  // 消息内容
-  oneof content {
-    HelloMessage hello = 5;
-    ListenMessage listen = 6;
-    ChatMessage chat = 7;
-    AbortMessage abort = 8;
-    VisionMessage vision = 9;
-    ImageMessage image = 10;
-    MCPMessage mcp = 11;
-    AudioData audio = 12;
-  }
+  // 消息数据（JSON格式）
+  bytes message_data = 5;
   
   // 时间戳
-  int64 timestamp = 13;
+  int64 timestamp = 6;
 }
 
 // 聊天响应消息
@@ -49,152 +40,13 @@ message ChatResponse {
   string session_id = 1;
   
   // 响应类型
-  ResponseType response_type = 2;
+  int32 response_type = 2;
   
-  // 响应内容
-  oneof content {
-    HelloResponse hello_response = 3;
-    STTResponse stt_response = 4;
-    TTSResponse tts_response = 5;
-    EmotionResponse emotion_response = 6;
-    AudioResponse audio_response = 7;
-    ErrorResponse error_response = 8;
-    StatusResponse status_response = 9;
-  }
+  // 响应数据（JSON格式）
+  bytes response_data = 3;
   
   // 时间戳
-  int64 timestamp = 10;
-}
-
-// 消息类型枚举
-enum MessageType {
-  MESSAGE_TYPE_UNSPECIFIED = 0;
-  MESSAGE_TYPE_HELLO = 1;
-  MESSAGE_TYPE_LISTEN = 2;
-  MESSAGE_TYPE_CHAT = 3;
-  MESSAGE_TYPE_ABORT = 4;
-  MESSAGE_TYPE_VISION = 5;
-  MESSAGE_TYPE_IMAGE = 6;
-  MESSAGE_TYPE_MCP = 7;
-  MESSAGE_TYPE_AUDIO = 8;
-}
-
-// 响应类型枚举
-enum ResponseType {
-  RESPONSE_TYPE_UNSPECIFIED = 0;
-  RESPONSE_TYPE_HELLO = 1;
-  RESPONSE_TYPE_STT = 2;
-  RESPONSE_TYPE_TTS = 3;
-  RESPONSE_TYPE_EMOTION = 4;
-  RESPONSE_TYPE_AUDIO = 5;
-  RESPONSE_TYPE_ERROR = 6;
-  RESPONSE_TYPE_STATUS = 7;
-}
-
-// Hello消息
-message HelloMessage {
-  AudioParams audio_params = 1;
-}
-
-// 音频参数
-message AudioParams {
-  string format = 1;
-  int32 sample_rate = 2;
-  int32 channels = 3;
-  int32 frame_duration = 4;
-}
-
-// Listen消息
-message ListenMessage {
-  string state = 1;  // start, stop, detect
-  string mode = 2;   // auto, manual
-  string text = 3;   // 可选文本内容
-}
-
-// Chat消息
-message ChatMessage {
-  string text = 1;
-}
-
-// Abort消息
-message AbortMessage {
-  string reason = 1;
-}
-
-// Vision消息
-message VisionMessage {
-  string cmd = 1;  // gen_pic, gen_video, read_img
-  map<string, string> params = 2;
-}
-
-// Image消息
-message ImageMessage {
-  string text = 1;
-  ImageData image_data = 2;
-}
-
-// 图片数据
-message ImageData {
-  string url = 1;
-  string data = 2;    // base64编码的图片数据
-  string format = 3;  // 图片格式
-}
-
-// MCP消息
-message MCPMessage {
-  string method = 1;
-  map<string, string> params = 2;
-}
-
-// 音频数据
-message AudioData {
-  bytes data = 1;
-  string format = 2;  // pcm, opus
-}
-
-// Hello响应
-message HelloResponse {
-  AudioParams server_audio_params = 1;
-  string status = 2;
-}
-
-// STT响应
-message STTResponse {
-  string text = 1;
-  bool is_final = 2;
-}
-
-// TTS响应
-message TTSResponse {
-  string state = 1;     // start, end
-  string text = 2;
-  int32 text_index = 3;
-}
-
-// 情绪响应
-message EmotionResponse {
-  string emotion = 1;   // thinking, speaking, listening
-}
-
-// 音频响应
-message AudioResponse {
-  bytes audio_data = 1;
-  string text = 2;
-  int32 round = 3;
-  int32 text_index = 4;
-  string format = 5;    // opus, pcm
-}
-
-// 错误响应
-message ErrorResponse {
-  string error_code = 1;
-  string error_message = 2;
-}
-
-// 状态响应
-message StatusResponse {
-  string status = 1;
-  map<string, string> details = 2;
+  int64 timestamp = 4;
 }
 
 // 健康检查请求

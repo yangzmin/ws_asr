@@ -41,8 +41,8 @@ func LoadConfig() (*Config, error) {
 		GRPC: GRPCConfig{
 			AIServiceAddr:    getEnv("AI_SERVICE_GRPC_ADDR", "localhost:50051"),
 			MaxConnections:   getEnvAsInt("GRPC_MAX_CONNECTIONS", 10),
-			HeartbeatSeconds: getEnvAsInt("GRPC_HEARTBEAT_SECONDS", 30),
-			ReconnectSeconds: getEnvAsInt("GRPC_RECONNECT_SECONDS", 5),
+			HeartbeatSeconds: getEnvAsInt("GRPC_HEARTBEAT_SECONDS", 120),
+			ReconnectSeconds: getEnvAsInt("GRPC_RECONNECT_SECONDS", 10),
 		},
 		JWT: JWTConfig{
 			Secret: getEnv("JWT_SECRET", "abc"),

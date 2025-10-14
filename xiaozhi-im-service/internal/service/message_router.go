@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/sirupsen/logrus"
 	pb "xiaozhi-grpc-proto/generated/go/ai_service"
 	"xiaozhi-im-service/internal/model"
+
+	"github.com/sirupsen/logrus"
 )
 
 // MessageRouter 消息路由器
@@ -60,36 +61,53 @@ func (mr *MessageRouter) Stop() {
 }
 
 // RouteWebSocketMessage 路由WebSocket消息到gRPC
-func (mr *MessageRouter) RouteWebSocketMessage(connectionID string, wsMsg *model.WebSocketMessage) error {
+func (mr *MessageRouter) RouteWebSocketMessage(connectionID string, data []byte) error {
+	fmt.Println("333333333333")
 	if !mr.isRunning {
 		return ErrServiceStopped
 	}
 
-	// 转换WebSocket消息为gRPC请求
-	grpcReq, err := mr.convertWebSocketToGRPC(wsMsg)
-	if err != nil {
-		mr.logger.WithFields(logrus.Fields{
-			"connection_id": connectionID,
-			"message_type":  wsMsg.Type,
-			"error":         err,
-		}).Error("WebSocket消息转换失败")
-		return fmt.Errorf("消息转换失败: %v", err)
+	// 获取连接信息
+	conn, exists := mr.connMgr.GetConnection(connectionID)
+	if !exists {
+		return ErrConnectionNotFound
 	}
+	fmt.Println("44444444444", conn)
 
-	// 发送到gRPC服务
-	if err := mr.grpcClient.SendMessage(connectionID, grpcReq); err != nil {
-		mr.logger.WithFields(logrus.Fields{
-			"connection_id": connectionID,
-			"message_type":  wsMsg.Type,
-			"error":         err,
-		}).Error("发送gRPC消息失败")
-		return fmt.Errorf("发送gRPC消息失败: %v", err)
+	// 从连接信息中获取必要的参数
+	sessionID := conn.Info.SessionID
+	deviceID := conn.Info.DeviceID
+	clientID := conn.Info.ClientID
+
+	// 如果SessionID为空，使用connectionID作为sessionID
+	if sessionID == "" {
+		sessionID = connectionID
 	}
 
 	mr.logger.WithFields(logrus.Fields{
 		"connection_id": connectionID,
-		"message_type":  wsMsg.Type,
-	}).Debug("WebSocket消息已路由到gRPC")
+		"session_id":    sessionID,
+		"device_id":     deviceID,
+		"client_id":     clientID,
+		"message_row":   string(data),
+	}).Debug("准备发送WebSocket消息到AI服务端")
+
+	// 发送JSON消息到AI服务端
+	if err := mr.grpcClient.SendTextMessage(sessionID, deviceID, clientID, data); err != nil {
+		mr.logger.WithFields(logrus.Fields{
+			"connection_id": connectionID,
+			"session_id":    sessionID,
+			"message_row":   string(data),
+			"error":         err,
+		}).Error("发送JSON消息失败")
+		return fmt.Errorf("发送JSON消息失败: %v", err)
+	}
+
+	mr.logger.WithFields(logrus.Fields{
+		"connection_id": connectionID,
+		"session_id":    sessionID,
+		"message_row":   string(data),
+	}).Debug("WebSocket消息已路由到AI服务端")
 
 	return nil
 }
@@ -102,6 +120,7 @@ func (mr *MessageRouter) RouteGRPCMessage(connectionID string, grpcResp *pb.Chat
 
 	// 转换gRPC响应为WebSocket消息
 	wsMsg, err := mr.convertGRPCToWebSocket(grpcResp)
+	fmt.Println("wsMsgwsMsg", wsMsg)
 	if err != nil {
 		mr.logger.WithFields(logrus.Fields{
 			"connection_id": connectionID,
@@ -116,8 +135,9 @@ func (mr *MessageRouter) RouteGRPCMessage(connectionID string, grpcResp *pb.Chat
 		return ErrConnectionNotFound
 	}
 
-	// 序列化消息
-	data, err := json.Marshal(wsMsg)
+	// 序列化消息 - 只发送wsMsg.Data部分
+	data, err := json.Marshal(wsMsg.Data)
+	fmt.Println("datadatadata", string(data))
 	if err != nil {
 		mr.logger.WithFields(logrus.Fields{
 			"connection_id": connectionID,
@@ -143,8 +163,19 @@ func (mr *MessageRouter) RouteGRPCMessage(connectionID string, grpcResp *pb.Chat
 	return nil
 }
 
-// StartMessageLoop 启动消息循环处理
+// StartMessageLoop 启动消息循环
 func (mr *MessageRouter) StartMessageLoop(connectionID string) {
+	// 确保在启动消息循环前创建gRPC流
+	if _, exists := mr.grpcClient.GetStream(connectionID); !exists {
+		if _, err := mr.grpcClient.CreateStream(connectionID); err != nil {
+			mr.logger.WithFields(logrus.Fields{
+				"connection_id": connectionID,
+				"error":         err,
+			}).Error("创建gRPC流失败")
+			return
+		}
+	}
+
 	go mr.handleGRPCMessages(connectionID)
 }
 
@@ -191,213 +222,35 @@ func (mr *MessageRouter) handleGRPCMessages(connectionID string) {
 
 // convertWebSocketToGRPC 转换WebSocket消息为gRPC请求
 func (mr *MessageRouter) convertWebSocketToGRPC(wsMsg *model.WebSocketMessage) (*pb.ChatRequest, error) {
+	// 将WebSocket消息转换为JSON字符串
+	jsonData, err := json.Marshal(wsMsg)
+	if err != nil {
+		return nil, fmt.Errorf("序列化WebSocket消息失败: %v", err)
+	}
+
 	req := &pb.ChatRequest{
-		Timestamp: wsMsg.Timestamp,
+		MessageType: 1, // 使用int32类型，1表示文本消息
+		MessageData: jsonData,
+		Timestamp:   wsMsg.Timestamp,
 	}
-
-	switch wsMsg.Type {
-	case "hello":
-		helloMsg := &model.HelloMessage{}
-		if wsMsg.Data != nil {
-			if err := mr.mapToStruct(wsMsg.Data, helloMsg); err != nil {
-				return nil, fmt.Errorf("解析hello消息失败: %v", err)
-			}
-		}
-
-		req.Content = &pb.ChatRequest_Hello{
-			Hello: &pb.HelloMessage{
-				AudioParams: mr.convertAudioParams(helloMsg.AudioParams),
-			},
-		}
-
-	case "listen":
-		listenMsg := &model.ListenMessage{}
-		if err := mr.mapToStruct(wsMsg.Data, listenMsg); err != nil {
-			return nil, fmt.Errorf("解析listen消息失败: %v", err)
-		}
-
-		req.Content = &pb.ChatRequest_Listen{
-			Listen: &pb.ListenMessage{
-				State: listenMsg.State,
-				Mode:  listenMsg.Mode,
-				Text:  listenMsg.Text,
-			},
-		}
-
-	case "chat":
-		chatMsg := &model.ChatMessage{}
-		if err := mr.mapToStruct(wsMsg.Data, chatMsg); err != nil {
-			return nil, fmt.Errorf("解析chat消息失败: %v", err)
-		}
-
-		req.Content = &pb.ChatRequest_Chat{
-			Chat: &pb.ChatMessage{
-				Text: chatMsg.Text,
-			},
-		}
-
-	case "abort":
-		abortMsg := &model.AbortMessage{}
-		if wsMsg.Data != nil {
-			if err := mr.mapToStruct(wsMsg.Data, abortMsg); err != nil {
-				return nil, fmt.Errorf("解析abort消息失败: %v", err)
-			}
-		}
-
-		req.Content = &pb.ChatRequest_Abort{
-			Abort: &pb.AbortMessage{
-				Reason: abortMsg.Reason,
-			},
-		}
-
-	case "vision":
-		visionMsg := &model.VisionMessage{}
-		if err := mr.mapToStruct(wsMsg.Data, visionMsg); err != nil {
-			return nil, fmt.Errorf("解析vision消息失败: %v", err)
-		}
-
-		req.Content = &pb.ChatRequest_Vision{
-			Vision: &pb.VisionMessage{
-				Cmd:    visionMsg.Cmd,
-				Params: visionMsg.Params,
-			},
-		}
-
-	case "image":
-		imageMsg := &model.ImageMessage{}
-		if err := mr.mapToStruct(wsMsg.Data, imageMsg); err != nil {
-			return nil, fmt.Errorf("解析image消息失败: %v", err)
-		}
-
-		req.Content = &pb.ChatRequest_Image{
-			Image: &pb.ImageMessage{
-				Text:      imageMsg.Text,
-				ImageData: mr.convertImageData(imageMsg.ImageData),
-			},
-		}
-
-	case "mcp":
-		mcpMsg := &model.MCPMessage{}
-		if err := mr.mapToStruct(wsMsg.Data, mcpMsg); err != nil {
-			return nil, fmt.Errorf("解析mcp消息失败: %v", err)
-		}
-
-		req.Content = &pb.ChatRequest_Mcp{
-			Mcp: &pb.MCPMessage{
-				Method: mcpMsg.Method,
-				Params: mcpMsg.Params,
-			},
-		}
-
-	case "audio":
-		// 处理音频数据
-		audioData, ok := wsMsg.Data["audio_data"].([]byte)
-		if !ok {
-			return nil, fmt.Errorf("无效的音频数据")
-		}
-
-		req.Content = &pb.ChatRequest_Audio{
-			Audio: &pb.AudioData{
-				Data: audioData,
-			},
-		}
-
-	default:
-		return nil, fmt.Errorf("不支持的消息类型: %s", wsMsg.Type)
-	}
-
 	return req, nil
 }
 
 // convertGRPCToWebSocket 转换gRPC响应为WebSocket消息
 func (mr *MessageRouter) convertGRPCToWebSocket(grpcResp *pb.ChatResponse) (*model.WebSocketMessage, error) {
-	wsMsg := &model.WebSocketMessage{
-		Timestamp: grpcResp.Timestamp,
-		Data:      make(map[string]interface{}),
+	// 将gRPC响应的ResponseData解析为JSON
+	var data map[string]interface{}
+	if err := json.Unmarshal(grpcResp.ResponseData, &data); err != nil {
+		return nil, fmt.Errorf("解析gRPC响应数据失败: %v", err)
 	}
 
-	switch resp := grpcResp.Content.(type) {
-	case *pb.ChatResponse_HelloResponse:
-		wsMsg.Type = "hello_response"
-		wsMsg.Data["server_audio_params"] = mr.convertAudioParamsFromPB(resp.HelloResponse.ServerAudioParams)
-		wsMsg.Data["status"] = resp.HelloResponse.Status
-
-	case *pb.ChatResponse_SttResponse:
-		wsMsg.Type = "stt_response"
-		wsMsg.Data["text"] = resp.SttResponse.Text
-		wsMsg.Data["is_final"] = resp.SttResponse.IsFinal
-
-	case *pb.ChatResponse_TtsResponse:
-		wsMsg.Type = "tts_response"
-		wsMsg.Data["state"] = resp.TtsResponse.State
-		wsMsg.Data["text"] = resp.TtsResponse.Text
-		wsMsg.Data["text_index"] = resp.TtsResponse.TextIndex
-
-	case *pb.ChatResponse_EmotionResponse:
-		wsMsg.Type = "emotion_response"
-		wsMsg.Data["emotion"] = resp.EmotionResponse.Emotion
-
-	case *pb.ChatResponse_AudioResponse:
-		wsMsg.Type = "audio_response"
-		wsMsg.Data["audio_data"] = resp.AudioResponse.AudioData
-		wsMsg.Data["text"] = resp.AudioResponse.Text
-		wsMsg.Data["round"] = resp.AudioResponse.Round
-		wsMsg.Data["text_index"] = resp.AudioResponse.TextIndex
-		wsMsg.Data["format"] = resp.AudioResponse.Format
-
-	case *pb.ChatResponse_ErrorResponse:
-		wsMsg.Type = "error_response"
-		wsMsg.Data["error_code"] = resp.ErrorResponse.ErrorCode
-		wsMsg.Data["error_message"] = resp.ErrorResponse.ErrorMessage
-
-	case *pb.ChatResponse_StatusResponse:
-		wsMsg.Type = "status_response"
-		wsMsg.Data["status"] = resp.StatusResponse.Status
-		wsMsg.Data["details"] = resp.StatusResponse.Details
-
-	default:
-		return nil, fmt.Errorf("不支持的gRPC响应类型")
+	wsMsg := &model.WebSocketMessage{
+		Type:      "response",
+		Data:      data,
+		Timestamp: grpcResp.Timestamp,
 	}
 
 	return wsMsg, nil
-}
-
-// convertAudioParams 转换音频参数
-func (mr *MessageRouter) convertAudioParams(params *model.AudioParams) *pb.AudioParams {
-	if params == nil {
-		return nil
-	}
-	return &pb.AudioParams{
-		Format:        params.Format,
-		SampleRate:    params.SampleRate,
-		Channels:      params.Channels,
-		FrameDuration: params.FrameDuration,
-	}
-}
-
-// convertAudioParamsFromPB 从protobuf转换音频参数
-func (mr *MessageRouter) convertAudioParamsFromPB(params *pb.AudioParams) *model.AudioParams {
-	if params == nil {
-		return nil
-	}
-	return &model.AudioParams{
-		Format:        params.Format,
-		SampleRate:    params.SampleRate,
-		Channels:      params.Channels,
-		FrameDuration: params.FrameDuration,
-	}
-}
-
-// convertImageData 转换图片数据
-func (mr *MessageRouter) convertImageData(data *model.ImageData) *pb.ImageData {
-	if data == nil {
-		return nil
-	}
-	return &pb.ImageData{
-		Url:    data.URL,
-		Data:   data.Data,
-		Format: data.Format,
-	}
 }
 
 // mapToStruct 将map转换为结构体
@@ -407,4 +260,81 @@ func (mr *MessageRouter) mapToStruct(data map[string]interface{}, target interfa
 		return err
 	}
 	return json.Unmarshal(jsonData, target)
+}
+
+// convertWebSocketToJSON 将WebSocket消息转换为AI服务端期望的JSON格式
+func (mr *MessageRouter) convertWebSocketToJSON(wsMsg *model.WebSocketMessage) (string, error) {
+	// 创建AI服务端期望的消息格式
+	jsonMsg := map[string]interface{}{
+		"type": wsMsg.Type,
+	}
+
+	// 根据消息类型添加相应的数据
+	switch wsMsg.Type {
+	case "hello":
+		if wsMsg.Data != nil {
+			// 将Data中的内容直接合并到根级别
+			for key, value := range wsMsg.Data {
+				jsonMsg[key] = value
+			}
+		}
+
+	case "listen":
+		if wsMsg.Data != nil {
+			for key, value := range wsMsg.Data {
+				jsonMsg[key] = value
+			}
+		}
+
+	case "chat":
+		if wsMsg.Data != nil {
+			for key, value := range wsMsg.Data {
+				jsonMsg[key] = value
+			}
+		}
+
+	case "abort":
+		if wsMsg.Data != nil {
+			for key, value := range wsMsg.Data {
+				jsonMsg[key] = value
+			}
+		}
+
+	case "vision":
+		if wsMsg.Data != nil {
+			for key, value := range wsMsg.Data {
+				jsonMsg[key] = value
+			}
+		}
+
+	case "image":
+		if wsMsg.Data != nil {
+			for key, value := range wsMsg.Data {
+				jsonMsg[key] = value
+			}
+		}
+
+	case "mcp":
+		if wsMsg.Data != nil {
+			for key, value := range wsMsg.Data {
+				jsonMsg[key] = value
+			}
+		}
+	}
+
+	// 序列化为JSON字符串
+	jsonBytes, err := json.Marshal(jsonMsg)
+	if err != nil {
+		return "", fmt.Errorf("序列化JSON失败: %v", err)
+	}
+
+	return string(jsonBytes), nil
+}
+
+// 删除重复的RouteWebSocketMessage方法定义，保留原有的正确方法
+
+// RouteBinaryMessage 路由二进制音频数据到gRPC
+func (r *MessageRouter) RouteBinaryMessage(connectionID string, audioData []byte) error {
+	// 直接发送二进制音频数据
+	return r.grpcClient.SendBinaryMessage(connectionID, "", "", audioData)
 }

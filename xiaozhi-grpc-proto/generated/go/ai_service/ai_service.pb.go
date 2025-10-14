@@ -21,139 +21,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// 消息类型枚举
-type MessageType int32
-
-const (
-	MessageType_MESSAGE_TYPE_UNSPECIFIED MessageType = 0
-	MessageType_MESSAGE_TYPE_HELLO       MessageType = 1
-	MessageType_MESSAGE_TYPE_LISTEN      MessageType = 2
-	MessageType_MESSAGE_TYPE_CHAT        MessageType = 3
-	MessageType_MESSAGE_TYPE_ABORT       MessageType = 4
-	MessageType_MESSAGE_TYPE_VISION      MessageType = 5
-	MessageType_MESSAGE_TYPE_IMAGE       MessageType = 6
-	MessageType_MESSAGE_TYPE_MCP         MessageType = 7
-	MessageType_MESSAGE_TYPE_AUDIO       MessageType = 8
-)
-
-// Enum value maps for MessageType.
-var (
-	MessageType_name = map[int32]string{
-		0: "MESSAGE_TYPE_UNSPECIFIED",
-		1: "MESSAGE_TYPE_HELLO",
-		2: "MESSAGE_TYPE_LISTEN",
-		3: "MESSAGE_TYPE_CHAT",
-		4: "MESSAGE_TYPE_ABORT",
-		5: "MESSAGE_TYPE_VISION",
-		6: "MESSAGE_TYPE_IMAGE",
-		7: "MESSAGE_TYPE_MCP",
-		8: "MESSAGE_TYPE_AUDIO",
-	}
-	MessageType_value = map[string]int32{
-		"MESSAGE_TYPE_UNSPECIFIED": 0,
-		"MESSAGE_TYPE_HELLO":       1,
-		"MESSAGE_TYPE_LISTEN":      2,
-		"MESSAGE_TYPE_CHAT":        3,
-		"MESSAGE_TYPE_ABORT":       4,
-		"MESSAGE_TYPE_VISION":      5,
-		"MESSAGE_TYPE_IMAGE":       6,
-		"MESSAGE_TYPE_MCP":         7,
-		"MESSAGE_TYPE_AUDIO":       8,
-	}
-)
-
-func (x MessageType) Enum() *MessageType {
-	p := new(MessageType)
-	*p = x
-	return p
-}
-
-func (x MessageType) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (MessageType) Descriptor() protoreflect.EnumDescriptor {
-	return file_ai_service_proto_enumTypes[0].Descriptor()
-}
-
-func (MessageType) Type() protoreflect.EnumType {
-	return &file_ai_service_proto_enumTypes[0]
-}
-
-func (x MessageType) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use MessageType.Descriptor instead.
-func (MessageType) EnumDescriptor() ([]byte, []int) {
-	return file_ai_service_proto_rawDescGZIP(), []int{0}
-}
-
-// 响应类型枚举
-type ResponseType int32
-
-const (
-	ResponseType_RESPONSE_TYPE_UNSPECIFIED ResponseType = 0
-	ResponseType_RESPONSE_TYPE_HELLO       ResponseType = 1
-	ResponseType_RESPONSE_TYPE_STT         ResponseType = 2
-	ResponseType_RESPONSE_TYPE_TTS         ResponseType = 3
-	ResponseType_RESPONSE_TYPE_EMOTION     ResponseType = 4
-	ResponseType_RESPONSE_TYPE_AUDIO       ResponseType = 5
-	ResponseType_RESPONSE_TYPE_ERROR       ResponseType = 6
-	ResponseType_RESPONSE_TYPE_STATUS      ResponseType = 7
-)
-
-// Enum value maps for ResponseType.
-var (
-	ResponseType_name = map[int32]string{
-		0: "RESPONSE_TYPE_UNSPECIFIED",
-		1: "RESPONSE_TYPE_HELLO",
-		2: "RESPONSE_TYPE_STT",
-		3: "RESPONSE_TYPE_TTS",
-		4: "RESPONSE_TYPE_EMOTION",
-		5: "RESPONSE_TYPE_AUDIO",
-		6: "RESPONSE_TYPE_ERROR",
-		7: "RESPONSE_TYPE_STATUS",
-	}
-	ResponseType_value = map[string]int32{
-		"RESPONSE_TYPE_UNSPECIFIED": 0,
-		"RESPONSE_TYPE_HELLO":       1,
-		"RESPONSE_TYPE_STT":         2,
-		"RESPONSE_TYPE_TTS":         3,
-		"RESPONSE_TYPE_EMOTION":     4,
-		"RESPONSE_TYPE_AUDIO":       5,
-		"RESPONSE_TYPE_ERROR":       6,
-		"RESPONSE_TYPE_STATUS":      7,
-	}
-)
-
-func (x ResponseType) Enum() *ResponseType {
-	p := new(ResponseType)
-	*p = x
-	return p
-}
-
-func (x ResponseType) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (ResponseType) Descriptor() protoreflect.EnumDescriptor {
-	return file_ai_service_proto_enumTypes[1].Descriptor()
-}
-
-func (ResponseType) Type() protoreflect.EnumType {
-	return &file_ai_service_proto_enumTypes[1]
-}
-
-func (x ResponseType) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use ResponseType.Descriptor instead.
-func (ResponseType) EnumDescriptor() ([]byte, []int) {
-	return file_ai_service_proto_rawDescGZIP(), []int{1}
-}
-
 type HealthCheckResponse_ServingStatus int32
 
 const (
@@ -187,11 +54,11 @@ func (x HealthCheckResponse_ServingStatus) String() string {
 }
 
 func (HealthCheckResponse_ServingStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_ai_service_proto_enumTypes[2].Descriptor()
+	return file_ai_service_proto_enumTypes[0].Descriptor()
 }
 
 func (HealthCheckResponse_ServingStatus) Type() protoreflect.EnumType {
-	return &file_ai_service_proto_enumTypes[2]
+	return &file_ai_service_proto_enumTypes[0]
 }
 
 func (x HealthCheckResponse_ServingStatus) Number() protoreflect.EnumNumber {
@@ -200,7 +67,7 @@ func (x HealthCheckResponse_ServingStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use HealthCheckResponse_ServingStatus.Descriptor instead.
 func (HealthCheckResponse_ServingStatus) EnumDescriptor() ([]byte, []int) {
-	return file_ai_service_proto_rawDescGZIP(), []int{20, 0}
+	return file_ai_service_proto_rawDescGZIP(), []int{3, 0}
 }
 
 // 聊天请求消息
@@ -213,22 +80,11 @@ type ChatRequest struct {
 	// 客户端ID
 	ClientId string `protobuf:"bytes,3,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
 	// 消息类型
-	MessageType MessageType `protobuf:"varint,4,opt,name=message_type,json=messageType,proto3,enum=ai_service.MessageType" json:"message_type,omitempty"`
-	// 消息内容
-	//
-	// Types that are valid to be assigned to Content:
-	//
-	//	*ChatRequest_Hello
-	//	*ChatRequest_Listen
-	//	*ChatRequest_Chat
-	//	*ChatRequest_Abort
-	//	*ChatRequest_Vision
-	//	*ChatRequest_Image
-	//	*ChatRequest_Mcp
-	//	*ChatRequest_Audio
-	Content isChatRequest_Content `protobuf_oneof:"content"`
+	MessageType int32 `protobuf:"varint,4,opt,name=message_type,json=messageType,proto3" json:"message_type,omitempty"`
+	// 消息数据（JSON格式）
+	MessageData []byte `protobuf:"bytes,5,opt,name=message_data,json=messageData,proto3" json:"message_data,omitempty"`
 	// 时间戳
-	Timestamp     int64 `protobuf:"varint,13,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	Timestamp     int64 `protobuf:"varint,6,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -284,88 +140,16 @@ func (x *ChatRequest) GetClientId() string {
 	return ""
 }
 
-func (x *ChatRequest) GetMessageType() MessageType {
+func (x *ChatRequest) GetMessageType() int32 {
 	if x != nil {
 		return x.MessageType
 	}
-	return MessageType_MESSAGE_TYPE_UNSPECIFIED
+	return 0
 }
 
-func (x *ChatRequest) GetContent() isChatRequest_Content {
+func (x *ChatRequest) GetMessageData() []byte {
 	if x != nil {
-		return x.Content
-	}
-	return nil
-}
-
-func (x *ChatRequest) GetHello() *HelloMessage {
-	if x != nil {
-		if x, ok := x.Content.(*ChatRequest_Hello); ok {
-			return x.Hello
-		}
-	}
-	return nil
-}
-
-func (x *ChatRequest) GetListen() *ListenMessage {
-	if x != nil {
-		if x, ok := x.Content.(*ChatRequest_Listen); ok {
-			return x.Listen
-		}
-	}
-	return nil
-}
-
-func (x *ChatRequest) GetChat() *ChatMessage {
-	if x != nil {
-		if x, ok := x.Content.(*ChatRequest_Chat); ok {
-			return x.Chat
-		}
-	}
-	return nil
-}
-
-func (x *ChatRequest) GetAbort() *AbortMessage {
-	if x != nil {
-		if x, ok := x.Content.(*ChatRequest_Abort); ok {
-			return x.Abort
-		}
-	}
-	return nil
-}
-
-func (x *ChatRequest) GetVision() *VisionMessage {
-	if x != nil {
-		if x, ok := x.Content.(*ChatRequest_Vision); ok {
-			return x.Vision
-		}
-	}
-	return nil
-}
-
-func (x *ChatRequest) GetImage() *ImageMessage {
-	if x != nil {
-		if x, ok := x.Content.(*ChatRequest_Image); ok {
-			return x.Image
-		}
-	}
-	return nil
-}
-
-func (x *ChatRequest) GetMcp() *MCPMessage {
-	if x != nil {
-		if x, ok := x.Content.(*ChatRequest_Mcp); ok {
-			return x.Mcp
-		}
-	}
-	return nil
-}
-
-func (x *ChatRequest) GetAudio() *AudioData {
-	if x != nil {
-		if x, ok := x.Content.(*ChatRequest_Audio); ok {
-			return x.Audio
-		}
+		return x.MessageData
 	}
 	return nil
 }
@@ -377,79 +161,17 @@ func (x *ChatRequest) GetTimestamp() int64 {
 	return 0
 }
 
-type isChatRequest_Content interface {
-	isChatRequest_Content()
-}
-
-type ChatRequest_Hello struct {
-	Hello *HelloMessage `protobuf:"bytes,5,opt,name=hello,proto3,oneof"`
-}
-
-type ChatRequest_Listen struct {
-	Listen *ListenMessage `protobuf:"bytes,6,opt,name=listen,proto3,oneof"`
-}
-
-type ChatRequest_Chat struct {
-	Chat *ChatMessage `protobuf:"bytes,7,opt,name=chat,proto3,oneof"`
-}
-
-type ChatRequest_Abort struct {
-	Abort *AbortMessage `protobuf:"bytes,8,opt,name=abort,proto3,oneof"`
-}
-
-type ChatRequest_Vision struct {
-	Vision *VisionMessage `protobuf:"bytes,9,opt,name=vision,proto3,oneof"`
-}
-
-type ChatRequest_Image struct {
-	Image *ImageMessage `protobuf:"bytes,10,opt,name=image,proto3,oneof"`
-}
-
-type ChatRequest_Mcp struct {
-	Mcp *MCPMessage `protobuf:"bytes,11,opt,name=mcp,proto3,oneof"`
-}
-
-type ChatRequest_Audio struct {
-	Audio *AudioData `protobuf:"bytes,12,opt,name=audio,proto3,oneof"`
-}
-
-func (*ChatRequest_Hello) isChatRequest_Content() {}
-
-func (*ChatRequest_Listen) isChatRequest_Content() {}
-
-func (*ChatRequest_Chat) isChatRequest_Content() {}
-
-func (*ChatRequest_Abort) isChatRequest_Content() {}
-
-func (*ChatRequest_Vision) isChatRequest_Content() {}
-
-func (*ChatRequest_Image) isChatRequest_Content() {}
-
-func (*ChatRequest_Mcp) isChatRequest_Content() {}
-
-func (*ChatRequest_Audio) isChatRequest_Content() {}
-
 // 聊天响应消息
 type ChatResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 会话ID
 	SessionId string `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	// 响应类型
-	ResponseType ResponseType `protobuf:"varint,2,opt,name=response_type,json=responseType,proto3,enum=ai_service.ResponseType" json:"response_type,omitempty"`
-	// 响应内容
-	//
-	// Types that are valid to be assigned to Content:
-	//
-	//	*ChatResponse_HelloResponse
-	//	*ChatResponse_SttResponse
-	//	*ChatResponse_TtsResponse
-	//	*ChatResponse_EmotionResponse
-	//	*ChatResponse_AudioResponse
-	//	*ChatResponse_ErrorResponse
-	//	*ChatResponse_StatusResponse
-	Content isChatResponse_Content `protobuf_oneof:"content"`
+	ResponseType int32 `protobuf:"varint,2,opt,name=response_type,json=responseType,proto3" json:"response_type,omitempty"`
+	// 响应数据（JSON格式）
+	ResponseData []byte `protobuf:"bytes,3,opt,name=response_data,json=responseData,proto3" json:"response_data,omitempty"`
 	// 时间戳
-	Timestamp     int64 `protobuf:"varint,10,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	Timestamp     int64 `protobuf:"varint,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -491,79 +213,16 @@ func (x *ChatResponse) GetSessionId() string {
 	return ""
 }
 
-func (x *ChatResponse) GetResponseType() ResponseType {
+func (x *ChatResponse) GetResponseType() int32 {
 	if x != nil {
 		return x.ResponseType
 	}
-	return ResponseType_RESPONSE_TYPE_UNSPECIFIED
+	return 0
 }
 
-func (x *ChatResponse) GetContent() isChatResponse_Content {
+func (x *ChatResponse) GetResponseData() []byte {
 	if x != nil {
-		return x.Content
-	}
-	return nil
-}
-
-func (x *ChatResponse) GetHelloResponse() *HelloResponse {
-	if x != nil {
-		if x, ok := x.Content.(*ChatResponse_HelloResponse); ok {
-			return x.HelloResponse
-		}
-	}
-	return nil
-}
-
-func (x *ChatResponse) GetSttResponse() *STTResponse {
-	if x != nil {
-		if x, ok := x.Content.(*ChatResponse_SttResponse); ok {
-			return x.SttResponse
-		}
-	}
-	return nil
-}
-
-func (x *ChatResponse) GetTtsResponse() *TTSResponse {
-	if x != nil {
-		if x, ok := x.Content.(*ChatResponse_TtsResponse); ok {
-			return x.TtsResponse
-		}
-	}
-	return nil
-}
-
-func (x *ChatResponse) GetEmotionResponse() *EmotionResponse {
-	if x != nil {
-		if x, ok := x.Content.(*ChatResponse_EmotionResponse); ok {
-			return x.EmotionResponse
-		}
-	}
-	return nil
-}
-
-func (x *ChatResponse) GetAudioResponse() *AudioResponse {
-	if x != nil {
-		if x, ok := x.Content.(*ChatResponse_AudioResponse); ok {
-			return x.AudioResponse
-		}
-	}
-	return nil
-}
-
-func (x *ChatResponse) GetErrorResponse() *ErrorResponse {
-	if x != nil {
-		if x, ok := x.Content.(*ChatResponse_ErrorResponse); ok {
-			return x.ErrorResponse
-		}
-	}
-	return nil
-}
-
-func (x *ChatResponse) GetStatusResponse() *StatusResponse {
-	if x != nil {
-		if x, ok := x.Content.(*ChatResponse_StatusResponse); ok {
-			return x.StatusResponse
-		}
+		return x.ResponseData
 	}
 	return nil
 }
@@ -573,985 +232,6 @@ func (x *ChatResponse) GetTimestamp() int64 {
 		return x.Timestamp
 	}
 	return 0
-}
-
-type isChatResponse_Content interface {
-	isChatResponse_Content()
-}
-
-type ChatResponse_HelloResponse struct {
-	HelloResponse *HelloResponse `protobuf:"bytes,3,opt,name=hello_response,json=helloResponse,proto3,oneof"`
-}
-
-type ChatResponse_SttResponse struct {
-	SttResponse *STTResponse `protobuf:"bytes,4,opt,name=stt_response,json=sttResponse,proto3,oneof"`
-}
-
-type ChatResponse_TtsResponse struct {
-	TtsResponse *TTSResponse `protobuf:"bytes,5,opt,name=tts_response,json=ttsResponse,proto3,oneof"`
-}
-
-type ChatResponse_EmotionResponse struct {
-	EmotionResponse *EmotionResponse `protobuf:"bytes,6,opt,name=emotion_response,json=emotionResponse,proto3,oneof"`
-}
-
-type ChatResponse_AudioResponse struct {
-	AudioResponse *AudioResponse `protobuf:"bytes,7,opt,name=audio_response,json=audioResponse,proto3,oneof"`
-}
-
-type ChatResponse_ErrorResponse struct {
-	ErrorResponse *ErrorResponse `protobuf:"bytes,8,opt,name=error_response,json=errorResponse,proto3,oneof"`
-}
-
-type ChatResponse_StatusResponse struct {
-	StatusResponse *StatusResponse `protobuf:"bytes,9,opt,name=status_response,json=statusResponse,proto3,oneof"`
-}
-
-func (*ChatResponse_HelloResponse) isChatResponse_Content() {}
-
-func (*ChatResponse_SttResponse) isChatResponse_Content() {}
-
-func (*ChatResponse_TtsResponse) isChatResponse_Content() {}
-
-func (*ChatResponse_EmotionResponse) isChatResponse_Content() {}
-
-func (*ChatResponse_AudioResponse) isChatResponse_Content() {}
-
-func (*ChatResponse_ErrorResponse) isChatResponse_Content() {}
-
-func (*ChatResponse_StatusResponse) isChatResponse_Content() {}
-
-// Hello消息
-type HelloMessage struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AudioParams   *AudioParams           `protobuf:"bytes,1,opt,name=audio_params,json=audioParams,proto3" json:"audio_params,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *HelloMessage) Reset() {
-	*x = HelloMessage{}
-	mi := &file_ai_service_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *HelloMessage) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*HelloMessage) ProtoMessage() {}
-
-func (x *HelloMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_service_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use HelloMessage.ProtoReflect.Descriptor instead.
-func (*HelloMessage) Descriptor() ([]byte, []int) {
-	return file_ai_service_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *HelloMessage) GetAudioParams() *AudioParams {
-	if x != nil {
-		return x.AudioParams
-	}
-	return nil
-}
-
-// 音频参数
-type AudioParams struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Format        string                 `protobuf:"bytes,1,opt,name=format,proto3" json:"format,omitempty"`
-	SampleRate    int32                  `protobuf:"varint,2,opt,name=sample_rate,json=sampleRate,proto3" json:"sample_rate,omitempty"`
-	Channels      int32                  `protobuf:"varint,3,opt,name=channels,proto3" json:"channels,omitempty"`
-	FrameDuration int32                  `protobuf:"varint,4,opt,name=frame_duration,json=frameDuration,proto3" json:"frame_duration,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *AudioParams) Reset() {
-	*x = AudioParams{}
-	mi := &file_ai_service_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *AudioParams) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*AudioParams) ProtoMessage() {}
-
-func (x *AudioParams) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_service_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use AudioParams.ProtoReflect.Descriptor instead.
-func (*AudioParams) Descriptor() ([]byte, []int) {
-	return file_ai_service_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *AudioParams) GetFormat() string {
-	if x != nil {
-		return x.Format
-	}
-	return ""
-}
-
-func (x *AudioParams) GetSampleRate() int32 {
-	if x != nil {
-		return x.SampleRate
-	}
-	return 0
-}
-
-func (x *AudioParams) GetChannels() int32 {
-	if x != nil {
-		return x.Channels
-	}
-	return 0
-}
-
-func (x *AudioParams) GetFrameDuration() int32 {
-	if x != nil {
-		return x.FrameDuration
-	}
-	return 0
-}
-
-// Listen消息
-type ListenMessage struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	State         string                 `protobuf:"bytes,1,opt,name=state,proto3" json:"state,omitempty"` // start, stop, detect
-	Mode          string                 `protobuf:"bytes,2,opt,name=mode,proto3" json:"mode,omitempty"`   // auto, manual
-	Text          string                 `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`   // 可选文本内容
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ListenMessage) Reset() {
-	*x = ListenMessage{}
-	mi := &file_ai_service_proto_msgTypes[4]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListenMessage) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListenMessage) ProtoMessage() {}
-
-func (x *ListenMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_service_proto_msgTypes[4]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ListenMessage.ProtoReflect.Descriptor instead.
-func (*ListenMessage) Descriptor() ([]byte, []int) {
-	return file_ai_service_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *ListenMessage) GetState() string {
-	if x != nil {
-		return x.State
-	}
-	return ""
-}
-
-func (x *ListenMessage) GetMode() string {
-	if x != nil {
-		return x.Mode
-	}
-	return ""
-}
-
-func (x *ListenMessage) GetText() string {
-	if x != nil {
-		return x.Text
-	}
-	return ""
-}
-
-// Chat消息
-type ChatMessage struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Text          string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ChatMessage) Reset() {
-	*x = ChatMessage{}
-	mi := &file_ai_service_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ChatMessage) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ChatMessage) ProtoMessage() {}
-
-func (x *ChatMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_service_proto_msgTypes[5]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ChatMessage.ProtoReflect.Descriptor instead.
-func (*ChatMessage) Descriptor() ([]byte, []int) {
-	return file_ai_service_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *ChatMessage) GetText() string {
-	if x != nil {
-		return x.Text
-	}
-	return ""
-}
-
-// Abort消息
-type AbortMessage struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Reason        string                 `protobuf:"bytes,1,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *AbortMessage) Reset() {
-	*x = AbortMessage{}
-	mi := &file_ai_service_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *AbortMessage) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*AbortMessage) ProtoMessage() {}
-
-func (x *AbortMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_service_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use AbortMessage.ProtoReflect.Descriptor instead.
-func (*AbortMessage) Descriptor() ([]byte, []int) {
-	return file_ai_service_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *AbortMessage) GetReason() string {
-	if x != nil {
-		return x.Reason
-	}
-	return ""
-}
-
-// Vision消息
-type VisionMessage struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Cmd           string                 `protobuf:"bytes,1,opt,name=cmd,proto3" json:"cmd,omitempty"` // gen_pic, gen_video, read_img
-	Params        map[string]string      `protobuf:"bytes,2,rep,name=params,proto3" json:"params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *VisionMessage) Reset() {
-	*x = VisionMessage{}
-	mi := &file_ai_service_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *VisionMessage) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*VisionMessage) ProtoMessage() {}
-
-func (x *VisionMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_service_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use VisionMessage.ProtoReflect.Descriptor instead.
-func (*VisionMessage) Descriptor() ([]byte, []int) {
-	return file_ai_service_proto_rawDescGZIP(), []int{7}
-}
-
-func (x *VisionMessage) GetCmd() string {
-	if x != nil {
-		return x.Cmd
-	}
-	return ""
-}
-
-func (x *VisionMessage) GetParams() map[string]string {
-	if x != nil {
-		return x.Params
-	}
-	return nil
-}
-
-// Image消息
-type ImageMessage struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Text          string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
-	ImageData     *ImageData             `protobuf:"bytes,2,opt,name=image_data,json=imageData,proto3" json:"image_data,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ImageMessage) Reset() {
-	*x = ImageMessage{}
-	mi := &file_ai_service_proto_msgTypes[8]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ImageMessage) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ImageMessage) ProtoMessage() {}
-
-func (x *ImageMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_service_proto_msgTypes[8]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ImageMessage.ProtoReflect.Descriptor instead.
-func (*ImageMessage) Descriptor() ([]byte, []int) {
-	return file_ai_service_proto_rawDescGZIP(), []int{8}
-}
-
-func (x *ImageMessage) GetText() string {
-	if x != nil {
-		return x.Text
-	}
-	return ""
-}
-
-func (x *ImageMessage) GetImageData() *ImageData {
-	if x != nil {
-		return x.ImageData
-	}
-	return nil
-}
-
-// 图片数据
-type ImageData struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Url           string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
-	Data          string                 `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`     // base64编码的图片数据
-	Format        string                 `protobuf:"bytes,3,opt,name=format,proto3" json:"format,omitempty"` // 图片格式
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ImageData) Reset() {
-	*x = ImageData{}
-	mi := &file_ai_service_proto_msgTypes[9]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ImageData) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ImageData) ProtoMessage() {}
-
-func (x *ImageData) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_service_proto_msgTypes[9]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ImageData.ProtoReflect.Descriptor instead.
-func (*ImageData) Descriptor() ([]byte, []int) {
-	return file_ai_service_proto_rawDescGZIP(), []int{9}
-}
-
-func (x *ImageData) GetUrl() string {
-	if x != nil {
-		return x.Url
-	}
-	return ""
-}
-
-func (x *ImageData) GetData() string {
-	if x != nil {
-		return x.Data
-	}
-	return ""
-}
-
-func (x *ImageData) GetFormat() string {
-	if x != nil {
-		return x.Format
-	}
-	return ""
-}
-
-// MCP消息
-type MCPMessage struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Method        string                 `protobuf:"bytes,1,opt,name=method,proto3" json:"method,omitempty"`
-	Params        map[string]string      `protobuf:"bytes,2,rep,name=params,proto3" json:"params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *MCPMessage) Reset() {
-	*x = MCPMessage{}
-	mi := &file_ai_service_proto_msgTypes[10]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *MCPMessage) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*MCPMessage) ProtoMessage() {}
-
-func (x *MCPMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_service_proto_msgTypes[10]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use MCPMessage.ProtoReflect.Descriptor instead.
-func (*MCPMessage) Descriptor() ([]byte, []int) {
-	return file_ai_service_proto_rawDescGZIP(), []int{10}
-}
-
-func (x *MCPMessage) GetMethod() string {
-	if x != nil {
-		return x.Method
-	}
-	return ""
-}
-
-func (x *MCPMessage) GetParams() map[string]string {
-	if x != nil {
-		return x.Params
-	}
-	return nil
-}
-
-// 音频数据
-type AudioData struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Data          []byte                 `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
-	Format        string                 `protobuf:"bytes,2,opt,name=format,proto3" json:"format,omitempty"` // pcm, opus
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *AudioData) Reset() {
-	*x = AudioData{}
-	mi := &file_ai_service_proto_msgTypes[11]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *AudioData) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*AudioData) ProtoMessage() {}
-
-func (x *AudioData) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_service_proto_msgTypes[11]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use AudioData.ProtoReflect.Descriptor instead.
-func (*AudioData) Descriptor() ([]byte, []int) {
-	return file_ai_service_proto_rawDescGZIP(), []int{11}
-}
-
-func (x *AudioData) GetData() []byte {
-	if x != nil {
-		return x.Data
-	}
-	return nil
-}
-
-func (x *AudioData) GetFormat() string {
-	if x != nil {
-		return x.Format
-	}
-	return ""
-}
-
-// Hello响应
-type HelloResponse struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	ServerAudioParams *AudioParams           `protobuf:"bytes,1,opt,name=server_audio_params,json=serverAudioParams,proto3" json:"server_audio_params,omitempty"`
-	Status            string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
-}
-
-func (x *HelloResponse) Reset() {
-	*x = HelloResponse{}
-	mi := &file_ai_service_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *HelloResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*HelloResponse) ProtoMessage() {}
-
-func (x *HelloResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_service_proto_msgTypes[12]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use HelloResponse.ProtoReflect.Descriptor instead.
-func (*HelloResponse) Descriptor() ([]byte, []int) {
-	return file_ai_service_proto_rawDescGZIP(), []int{12}
-}
-
-func (x *HelloResponse) GetServerAudioParams() *AudioParams {
-	if x != nil {
-		return x.ServerAudioParams
-	}
-	return nil
-}
-
-func (x *HelloResponse) GetStatus() string {
-	if x != nil {
-		return x.Status
-	}
-	return ""
-}
-
-// STT响应
-type STTResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Text          string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
-	IsFinal       bool                   `protobuf:"varint,2,opt,name=is_final,json=isFinal,proto3" json:"is_final,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *STTResponse) Reset() {
-	*x = STTResponse{}
-	mi := &file_ai_service_proto_msgTypes[13]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *STTResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*STTResponse) ProtoMessage() {}
-
-func (x *STTResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_service_proto_msgTypes[13]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use STTResponse.ProtoReflect.Descriptor instead.
-func (*STTResponse) Descriptor() ([]byte, []int) {
-	return file_ai_service_proto_rawDescGZIP(), []int{13}
-}
-
-func (x *STTResponse) GetText() string {
-	if x != nil {
-		return x.Text
-	}
-	return ""
-}
-
-func (x *STTResponse) GetIsFinal() bool {
-	if x != nil {
-		return x.IsFinal
-	}
-	return false
-}
-
-// TTS响应
-type TTSResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	State         string                 `protobuf:"bytes,1,opt,name=state,proto3" json:"state,omitempty"` // start, end
-	Text          string                 `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
-	TextIndex     int32                  `protobuf:"varint,3,opt,name=text_index,json=textIndex,proto3" json:"text_index,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *TTSResponse) Reset() {
-	*x = TTSResponse{}
-	mi := &file_ai_service_proto_msgTypes[14]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *TTSResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*TTSResponse) ProtoMessage() {}
-
-func (x *TTSResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_service_proto_msgTypes[14]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use TTSResponse.ProtoReflect.Descriptor instead.
-func (*TTSResponse) Descriptor() ([]byte, []int) {
-	return file_ai_service_proto_rawDescGZIP(), []int{14}
-}
-
-func (x *TTSResponse) GetState() string {
-	if x != nil {
-		return x.State
-	}
-	return ""
-}
-
-func (x *TTSResponse) GetText() string {
-	if x != nil {
-		return x.Text
-	}
-	return ""
-}
-
-func (x *TTSResponse) GetTextIndex() int32 {
-	if x != nil {
-		return x.TextIndex
-	}
-	return 0
-}
-
-// 情绪响应
-type EmotionResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Emotion       string                 `protobuf:"bytes,1,opt,name=emotion,proto3" json:"emotion,omitempty"` // thinking, speaking, listening
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *EmotionResponse) Reset() {
-	*x = EmotionResponse{}
-	mi := &file_ai_service_proto_msgTypes[15]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *EmotionResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*EmotionResponse) ProtoMessage() {}
-
-func (x *EmotionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_service_proto_msgTypes[15]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use EmotionResponse.ProtoReflect.Descriptor instead.
-func (*EmotionResponse) Descriptor() ([]byte, []int) {
-	return file_ai_service_proto_rawDescGZIP(), []int{15}
-}
-
-func (x *EmotionResponse) GetEmotion() string {
-	if x != nil {
-		return x.Emotion
-	}
-	return ""
-}
-
-// 音频响应
-type AudioResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AudioData     []byte                 `protobuf:"bytes,1,opt,name=audio_data,json=audioData,proto3" json:"audio_data,omitempty"`
-	Text          string                 `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
-	Round         int32                  `protobuf:"varint,3,opt,name=round,proto3" json:"round,omitempty"`
-	TextIndex     int32                  `protobuf:"varint,4,opt,name=text_index,json=textIndex,proto3" json:"text_index,omitempty"`
-	Format        string                 `protobuf:"bytes,5,opt,name=format,proto3" json:"format,omitempty"` // opus, pcm
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *AudioResponse) Reset() {
-	*x = AudioResponse{}
-	mi := &file_ai_service_proto_msgTypes[16]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *AudioResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*AudioResponse) ProtoMessage() {}
-
-func (x *AudioResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_service_proto_msgTypes[16]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use AudioResponse.ProtoReflect.Descriptor instead.
-func (*AudioResponse) Descriptor() ([]byte, []int) {
-	return file_ai_service_proto_rawDescGZIP(), []int{16}
-}
-
-func (x *AudioResponse) GetAudioData() []byte {
-	if x != nil {
-		return x.AudioData
-	}
-	return nil
-}
-
-func (x *AudioResponse) GetText() string {
-	if x != nil {
-		return x.Text
-	}
-	return ""
-}
-
-func (x *AudioResponse) GetRound() int32 {
-	if x != nil {
-		return x.Round
-	}
-	return 0
-}
-
-func (x *AudioResponse) GetTextIndex() int32 {
-	if x != nil {
-		return x.TextIndex
-	}
-	return 0
-}
-
-func (x *AudioResponse) GetFormat() string {
-	if x != nil {
-		return x.Format
-	}
-	return ""
-}
-
-// 错误响应
-type ErrorResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ErrorCode     string                 `protobuf:"bytes,1,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
-	ErrorMessage  string                 `protobuf:"bytes,2,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ErrorResponse) Reset() {
-	*x = ErrorResponse{}
-	mi := &file_ai_service_proto_msgTypes[17]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ErrorResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ErrorResponse) ProtoMessage() {}
-
-func (x *ErrorResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_service_proto_msgTypes[17]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ErrorResponse.ProtoReflect.Descriptor instead.
-func (*ErrorResponse) Descriptor() ([]byte, []int) {
-	return file_ai_service_proto_rawDescGZIP(), []int{17}
-}
-
-func (x *ErrorResponse) GetErrorCode() string {
-	if x != nil {
-		return x.ErrorCode
-	}
-	return ""
-}
-
-func (x *ErrorResponse) GetErrorMessage() string {
-	if x != nil {
-		return x.ErrorMessage
-	}
-	return ""
-}
-
-// 状态响应
-type StatusResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
-	Details       map[string]string      `protobuf:"bytes,2,rep,name=details,proto3" json:"details,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *StatusResponse) Reset() {
-	*x = StatusResponse{}
-	mi := &file_ai_service_proto_msgTypes[18]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *StatusResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*StatusResponse) ProtoMessage() {}
-
-func (x *StatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_service_proto_msgTypes[18]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use StatusResponse.ProtoReflect.Descriptor instead.
-func (*StatusResponse) Descriptor() ([]byte, []int) {
-	return file_ai_service_proto_rawDescGZIP(), []int{18}
-}
-
-func (x *StatusResponse) GetStatus() string {
-	if x != nil {
-		return x.Status
-	}
-	return ""
-}
-
-func (x *StatusResponse) GetDetails() map[string]string {
-	if x != nil {
-		return x.Details
-	}
-	return nil
 }
 
 // 健康检查请求
@@ -1564,7 +244,7 @@ type HealthCheckRequest struct {
 
 func (x *HealthCheckRequest) Reset() {
 	*x = HealthCheckRequest{}
-	mi := &file_ai_service_proto_msgTypes[19]
+	mi := &file_ai_service_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1576,7 +256,7 @@ func (x *HealthCheckRequest) String() string {
 func (*HealthCheckRequest) ProtoMessage() {}
 
 func (x *HealthCheckRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_service_proto_msgTypes[19]
+	mi := &file_ai_service_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1589,7 +269,7 @@ func (x *HealthCheckRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthCheckRequest.ProtoReflect.Descriptor instead.
 func (*HealthCheckRequest) Descriptor() ([]byte, []int) {
-	return file_ai_service_proto_rawDescGZIP(), []int{19}
+	return file_ai_service_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *HealthCheckRequest) GetService() string {
@@ -1609,7 +289,7 @@ type HealthCheckResponse struct {
 
 func (x *HealthCheckResponse) Reset() {
 	*x = HealthCheckResponse{}
-	mi := &file_ai_service_proto_msgTypes[20]
+	mi := &file_ai_service_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1621,7 +301,7 @@ func (x *HealthCheckResponse) String() string {
 func (*HealthCheckResponse) ProtoMessage() {}
 
 func (x *HealthCheckResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_service_proto_msgTypes[20]
+	mi := &file_ai_service_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1634,7 +314,7 @@ func (x *HealthCheckResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthCheckResponse.ProtoReflect.Descriptor instead.
 func (*HealthCheckResponse) Descriptor() ([]byte, []int) {
-	return file_ai_service_proto_rawDescGZIP(), []int{20}
+	return file_ai_service_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *HealthCheckResponse) GetStatus() HealthCheckResponse_ServingStatus {
@@ -1649,109 +329,21 @@ var File_ai_service_proto protoreflect.FileDescriptor
 const file_ai_service_proto_rawDesc = "" +
 	"\n" +
 	"\x10ai_service.proto\x12\n" +
-	"ai_service\"\xd5\x04\n" +
+	"ai_service\"\xca\x01\n" +
 	"\vChatRequest\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x1b\n" +
 	"\tdevice_id\x18\x02 \x01(\tR\bdeviceId\x12\x1b\n" +
-	"\tclient_id\x18\x03 \x01(\tR\bclientId\x12:\n" +
-	"\fmessage_type\x18\x04 \x01(\x0e2\x17.ai_service.MessageTypeR\vmessageType\x120\n" +
-	"\x05hello\x18\x05 \x01(\v2\x18.ai_service.HelloMessageH\x00R\x05hello\x123\n" +
-	"\x06listen\x18\x06 \x01(\v2\x19.ai_service.ListenMessageH\x00R\x06listen\x12-\n" +
-	"\x04chat\x18\a \x01(\v2\x17.ai_service.ChatMessageH\x00R\x04chat\x120\n" +
-	"\x05abort\x18\b \x01(\v2\x18.ai_service.AbortMessageH\x00R\x05abort\x123\n" +
-	"\x06vision\x18\t \x01(\v2\x19.ai_service.VisionMessageH\x00R\x06vision\x120\n" +
-	"\x05image\x18\n" +
-	" \x01(\v2\x18.ai_service.ImageMessageH\x00R\x05image\x12*\n" +
-	"\x03mcp\x18\v \x01(\v2\x16.ai_service.MCPMessageH\x00R\x03mcp\x12-\n" +
-	"\x05audio\x18\f \x01(\v2\x15.ai_service.AudioDataH\x00R\x05audio\x12\x1c\n" +
-	"\ttimestamp\x18\r \x01(\x03R\ttimestampB\t\n" +
-	"\acontent\"\xee\x04\n" +
+	"\tclient_id\x18\x03 \x01(\tR\bclientId\x12!\n" +
+	"\fmessage_type\x18\x04 \x01(\x05R\vmessageType\x12!\n" +
+	"\fmessage_data\x18\x05 \x01(\fR\vmessageData\x12\x1c\n" +
+	"\ttimestamp\x18\x06 \x01(\x03R\ttimestamp\"\x95\x01\n" +
 	"\fChatResponse\x12\x1d\n" +
 	"\n" +
-	"session_id\x18\x01 \x01(\tR\tsessionId\x12=\n" +
-	"\rresponse_type\x18\x02 \x01(\x0e2\x18.ai_service.ResponseTypeR\fresponseType\x12B\n" +
-	"\x0ehello_response\x18\x03 \x01(\v2\x19.ai_service.HelloResponseH\x00R\rhelloResponse\x12<\n" +
-	"\fstt_response\x18\x04 \x01(\v2\x17.ai_service.STTResponseH\x00R\vsttResponse\x12<\n" +
-	"\ftts_response\x18\x05 \x01(\v2\x17.ai_service.TTSResponseH\x00R\vttsResponse\x12H\n" +
-	"\x10emotion_response\x18\x06 \x01(\v2\x1b.ai_service.EmotionResponseH\x00R\x0femotionResponse\x12B\n" +
-	"\x0eaudio_response\x18\a \x01(\v2\x19.ai_service.AudioResponseH\x00R\raudioResponse\x12B\n" +
-	"\x0eerror_response\x18\b \x01(\v2\x19.ai_service.ErrorResponseH\x00R\rerrorResponse\x12E\n" +
-	"\x0fstatus_response\x18\t \x01(\v2\x1a.ai_service.StatusResponseH\x00R\x0estatusResponse\x12\x1c\n" +
-	"\ttimestamp\x18\n" +
-	" \x01(\x03R\ttimestampB\t\n" +
-	"\acontent\"J\n" +
-	"\fHelloMessage\x12:\n" +
-	"\faudio_params\x18\x01 \x01(\v2\x17.ai_service.AudioParamsR\vaudioParams\"\x89\x01\n" +
-	"\vAudioParams\x12\x16\n" +
-	"\x06format\x18\x01 \x01(\tR\x06format\x12\x1f\n" +
-	"\vsample_rate\x18\x02 \x01(\x05R\n" +
-	"sampleRate\x12\x1a\n" +
-	"\bchannels\x18\x03 \x01(\x05R\bchannels\x12%\n" +
-	"\x0eframe_duration\x18\x04 \x01(\x05R\rframeDuration\"M\n" +
-	"\rListenMessage\x12\x14\n" +
-	"\x05state\x18\x01 \x01(\tR\x05state\x12\x12\n" +
-	"\x04mode\x18\x02 \x01(\tR\x04mode\x12\x12\n" +
-	"\x04text\x18\x03 \x01(\tR\x04text\"!\n" +
-	"\vChatMessage\x12\x12\n" +
-	"\x04text\x18\x01 \x01(\tR\x04text\"&\n" +
-	"\fAbortMessage\x12\x16\n" +
-	"\x06reason\x18\x01 \x01(\tR\x06reason\"\x9b\x01\n" +
-	"\rVisionMessage\x12\x10\n" +
-	"\x03cmd\x18\x01 \x01(\tR\x03cmd\x12=\n" +
-	"\x06params\x18\x02 \x03(\v2%.ai_service.VisionMessage.ParamsEntryR\x06params\x1a9\n" +
-	"\vParamsEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"X\n" +
-	"\fImageMessage\x12\x12\n" +
-	"\x04text\x18\x01 \x01(\tR\x04text\x124\n" +
-	"\n" +
-	"image_data\x18\x02 \x01(\v2\x15.ai_service.ImageDataR\timageData\"I\n" +
-	"\tImageData\x12\x10\n" +
-	"\x03url\x18\x01 \x01(\tR\x03url\x12\x12\n" +
-	"\x04data\x18\x02 \x01(\tR\x04data\x12\x16\n" +
-	"\x06format\x18\x03 \x01(\tR\x06format\"\x9b\x01\n" +
-	"\n" +
-	"MCPMessage\x12\x16\n" +
-	"\x06method\x18\x01 \x01(\tR\x06method\x12:\n" +
-	"\x06params\x18\x02 \x03(\v2\".ai_service.MCPMessage.ParamsEntryR\x06params\x1a9\n" +
-	"\vParamsEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"7\n" +
-	"\tAudioData\x12\x12\n" +
-	"\x04data\x18\x01 \x01(\fR\x04data\x12\x16\n" +
-	"\x06format\x18\x02 \x01(\tR\x06format\"p\n" +
-	"\rHelloResponse\x12G\n" +
-	"\x13server_audio_params\x18\x01 \x01(\v2\x17.ai_service.AudioParamsR\x11serverAudioParams\x12\x16\n" +
-	"\x06status\x18\x02 \x01(\tR\x06status\"<\n" +
-	"\vSTTResponse\x12\x12\n" +
-	"\x04text\x18\x01 \x01(\tR\x04text\x12\x19\n" +
-	"\bis_final\x18\x02 \x01(\bR\aisFinal\"V\n" +
-	"\vTTSResponse\x12\x14\n" +
-	"\x05state\x18\x01 \x01(\tR\x05state\x12\x12\n" +
-	"\x04text\x18\x02 \x01(\tR\x04text\x12\x1d\n" +
-	"\n" +
-	"text_index\x18\x03 \x01(\x05R\ttextIndex\"+\n" +
-	"\x0fEmotionResponse\x12\x18\n" +
-	"\aemotion\x18\x01 \x01(\tR\aemotion\"\x8f\x01\n" +
-	"\rAudioResponse\x12\x1d\n" +
-	"\n" +
-	"audio_data\x18\x01 \x01(\fR\taudioData\x12\x12\n" +
-	"\x04text\x18\x02 \x01(\tR\x04text\x12\x14\n" +
-	"\x05round\x18\x03 \x01(\x05R\x05round\x12\x1d\n" +
-	"\n" +
-	"text_index\x18\x04 \x01(\x05R\ttextIndex\x12\x16\n" +
-	"\x06format\x18\x05 \x01(\tR\x06format\"S\n" +
-	"\rErrorResponse\x12\x1d\n" +
-	"\n" +
-	"error_code\x18\x01 \x01(\tR\terrorCode\x12#\n" +
-	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\"\xa7\x01\n" +
-	"\x0eStatusResponse\x12\x16\n" +
-	"\x06status\x18\x01 \x01(\tR\x06status\x12A\n" +
-	"\adetails\x18\x02 \x03(\v2'.ai_service.StatusResponse.DetailsEntryR\adetails\x1a:\n" +
-	"\fDetailsEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\".\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12#\n" +
+	"\rresponse_type\x18\x02 \x01(\x05R\fresponseType\x12#\n" +
+	"\rresponse_data\x18\x03 \x01(\fR\fresponseData\x12\x1c\n" +
+	"\ttimestamp\x18\x04 \x01(\x03R\ttimestamp\".\n" +
 	"\x12HealthCheckRequest\x12\x18\n" +
 	"\aservice\x18\x01 \x01(\tR\aservice\"\x98\x01\n" +
 	"\x13HealthCheckResponse\x12E\n" +
@@ -1759,26 +351,7 @@ const file_ai_service_proto_rawDesc = "" +
 	"\rServingStatus\x12\v\n" +
 	"\aUNKNOWN\x10\x00\x12\v\n" +
 	"\aSERVING\x10\x01\x12\x0f\n" +
-	"\vNOT_SERVING\x10\x02*\xea\x01\n" +
-	"\vMessageType\x12\x1c\n" +
-	"\x18MESSAGE_TYPE_UNSPECIFIED\x10\x00\x12\x16\n" +
-	"\x12MESSAGE_TYPE_HELLO\x10\x01\x12\x17\n" +
-	"\x13MESSAGE_TYPE_LISTEN\x10\x02\x12\x15\n" +
-	"\x11MESSAGE_TYPE_CHAT\x10\x03\x12\x16\n" +
-	"\x12MESSAGE_TYPE_ABORT\x10\x04\x12\x17\n" +
-	"\x13MESSAGE_TYPE_VISION\x10\x05\x12\x16\n" +
-	"\x12MESSAGE_TYPE_IMAGE\x10\x06\x12\x14\n" +
-	"\x10MESSAGE_TYPE_MCP\x10\a\x12\x16\n" +
-	"\x12MESSAGE_TYPE_AUDIO\x10\b*\xdb\x01\n" +
-	"\fResponseType\x12\x1d\n" +
-	"\x19RESPONSE_TYPE_UNSPECIFIED\x10\x00\x12\x17\n" +
-	"\x13RESPONSE_TYPE_HELLO\x10\x01\x12\x15\n" +
-	"\x11RESPONSE_TYPE_STT\x10\x02\x12\x15\n" +
-	"\x11RESPONSE_TYPE_TTS\x10\x03\x12\x19\n" +
-	"\x15RESPONSE_TYPE_EMOTION\x10\x04\x12\x17\n" +
-	"\x13RESPONSE_TYPE_AUDIO\x10\x05\x12\x17\n" +
-	"\x13RESPONSE_TYPE_ERROR\x10\x06\x12\x18\n" +
-	"\x14RESPONSE_TYPE_STATUS\x10\a2\xa0\x01\n" +
+	"\vNOT_SERVING\x10\x022\xa0\x01\n" +
 	"\tAIService\x12C\n" +
 	"\n" +
 	"ChatStream\x12\x17.ai_service.ChatRequest\x1a\x18.ai_service.ChatResponse(\x010\x01\x12N\n" +
@@ -1796,71 +369,26 @@ func file_ai_service_proto_rawDescGZIP() []byte {
 	return file_ai_service_proto_rawDescData
 }
 
-var file_ai_service_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_ai_service_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
+var file_ai_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_ai_service_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_ai_service_proto_goTypes = []any{
-	(MessageType)(0),                       // 0: ai_service.MessageType
-	(ResponseType)(0),                      // 1: ai_service.ResponseType
-	(HealthCheckResponse_ServingStatus)(0), // 2: ai_service.HealthCheckResponse.ServingStatus
-	(*ChatRequest)(nil),                    // 3: ai_service.ChatRequest
-	(*ChatResponse)(nil),                   // 4: ai_service.ChatResponse
-	(*HelloMessage)(nil),                   // 5: ai_service.HelloMessage
-	(*AudioParams)(nil),                    // 6: ai_service.AudioParams
-	(*ListenMessage)(nil),                  // 7: ai_service.ListenMessage
-	(*ChatMessage)(nil),                    // 8: ai_service.ChatMessage
-	(*AbortMessage)(nil),                   // 9: ai_service.AbortMessage
-	(*VisionMessage)(nil),                  // 10: ai_service.VisionMessage
-	(*ImageMessage)(nil),                   // 11: ai_service.ImageMessage
-	(*ImageData)(nil),                      // 12: ai_service.ImageData
-	(*MCPMessage)(nil),                     // 13: ai_service.MCPMessage
-	(*AudioData)(nil),                      // 14: ai_service.AudioData
-	(*HelloResponse)(nil),                  // 15: ai_service.HelloResponse
-	(*STTResponse)(nil),                    // 16: ai_service.STTResponse
-	(*TTSResponse)(nil),                    // 17: ai_service.TTSResponse
-	(*EmotionResponse)(nil),                // 18: ai_service.EmotionResponse
-	(*AudioResponse)(nil),                  // 19: ai_service.AudioResponse
-	(*ErrorResponse)(nil),                  // 20: ai_service.ErrorResponse
-	(*StatusResponse)(nil),                 // 21: ai_service.StatusResponse
-	(*HealthCheckRequest)(nil),             // 22: ai_service.HealthCheckRequest
-	(*HealthCheckResponse)(nil),            // 23: ai_service.HealthCheckResponse
-	nil,                                    // 24: ai_service.VisionMessage.ParamsEntry
-	nil,                                    // 25: ai_service.MCPMessage.ParamsEntry
-	nil,                                    // 26: ai_service.StatusResponse.DetailsEntry
+	(HealthCheckResponse_ServingStatus)(0), // 0: ai_service.HealthCheckResponse.ServingStatus
+	(*ChatRequest)(nil),                    // 1: ai_service.ChatRequest
+	(*ChatResponse)(nil),                   // 2: ai_service.ChatResponse
+	(*HealthCheckRequest)(nil),             // 3: ai_service.HealthCheckRequest
+	(*HealthCheckResponse)(nil),            // 4: ai_service.HealthCheckResponse
 }
 var file_ai_service_proto_depIdxs = []int32{
-	0,  // 0: ai_service.ChatRequest.message_type:type_name -> ai_service.MessageType
-	5,  // 1: ai_service.ChatRequest.hello:type_name -> ai_service.HelloMessage
-	7,  // 2: ai_service.ChatRequest.listen:type_name -> ai_service.ListenMessage
-	8,  // 3: ai_service.ChatRequest.chat:type_name -> ai_service.ChatMessage
-	9,  // 4: ai_service.ChatRequest.abort:type_name -> ai_service.AbortMessage
-	10, // 5: ai_service.ChatRequest.vision:type_name -> ai_service.VisionMessage
-	11, // 6: ai_service.ChatRequest.image:type_name -> ai_service.ImageMessage
-	13, // 7: ai_service.ChatRequest.mcp:type_name -> ai_service.MCPMessage
-	14, // 8: ai_service.ChatRequest.audio:type_name -> ai_service.AudioData
-	1,  // 9: ai_service.ChatResponse.response_type:type_name -> ai_service.ResponseType
-	15, // 10: ai_service.ChatResponse.hello_response:type_name -> ai_service.HelloResponse
-	16, // 11: ai_service.ChatResponse.stt_response:type_name -> ai_service.STTResponse
-	17, // 12: ai_service.ChatResponse.tts_response:type_name -> ai_service.TTSResponse
-	18, // 13: ai_service.ChatResponse.emotion_response:type_name -> ai_service.EmotionResponse
-	19, // 14: ai_service.ChatResponse.audio_response:type_name -> ai_service.AudioResponse
-	20, // 15: ai_service.ChatResponse.error_response:type_name -> ai_service.ErrorResponse
-	21, // 16: ai_service.ChatResponse.status_response:type_name -> ai_service.StatusResponse
-	6,  // 17: ai_service.HelloMessage.audio_params:type_name -> ai_service.AudioParams
-	24, // 18: ai_service.VisionMessage.params:type_name -> ai_service.VisionMessage.ParamsEntry
-	12, // 19: ai_service.ImageMessage.image_data:type_name -> ai_service.ImageData
-	25, // 20: ai_service.MCPMessage.params:type_name -> ai_service.MCPMessage.ParamsEntry
-	6,  // 21: ai_service.HelloResponse.server_audio_params:type_name -> ai_service.AudioParams
-	26, // 22: ai_service.StatusResponse.details:type_name -> ai_service.StatusResponse.DetailsEntry
-	2,  // 23: ai_service.HealthCheckResponse.status:type_name -> ai_service.HealthCheckResponse.ServingStatus
-	3,  // 24: ai_service.AIService.ChatStream:input_type -> ai_service.ChatRequest
-	22, // 25: ai_service.AIService.HealthCheck:input_type -> ai_service.HealthCheckRequest
-	4,  // 26: ai_service.AIService.ChatStream:output_type -> ai_service.ChatResponse
-	23, // 27: ai_service.AIService.HealthCheck:output_type -> ai_service.HealthCheckResponse
-	26, // [26:28] is the sub-list for method output_type
-	24, // [24:26] is the sub-list for method input_type
-	24, // [24:24] is the sub-list for extension type_name
-	24, // [24:24] is the sub-list for extension extendee
-	0,  // [0:24] is the sub-list for field type_name
+	0, // 0: ai_service.HealthCheckResponse.status:type_name -> ai_service.HealthCheckResponse.ServingStatus
+	1, // 1: ai_service.AIService.ChatStream:input_type -> ai_service.ChatRequest
+	3, // 2: ai_service.AIService.HealthCheck:input_type -> ai_service.HealthCheckRequest
+	2, // 3: ai_service.AIService.ChatStream:output_type -> ai_service.ChatResponse
+	4, // 4: ai_service.AIService.HealthCheck:output_type -> ai_service.HealthCheckResponse
+	3, // [3:5] is the sub-list for method output_type
+	1, // [1:3] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_ai_service_proto_init() }
@@ -1868,32 +396,13 @@ func file_ai_service_proto_init() {
 	if File_ai_service_proto != nil {
 		return
 	}
-	file_ai_service_proto_msgTypes[0].OneofWrappers = []any{
-		(*ChatRequest_Hello)(nil),
-		(*ChatRequest_Listen)(nil),
-		(*ChatRequest_Chat)(nil),
-		(*ChatRequest_Abort)(nil),
-		(*ChatRequest_Vision)(nil),
-		(*ChatRequest_Image)(nil),
-		(*ChatRequest_Mcp)(nil),
-		(*ChatRequest_Audio)(nil),
-	}
-	file_ai_service_proto_msgTypes[1].OneofWrappers = []any{
-		(*ChatResponse_HelloResponse)(nil),
-		(*ChatResponse_SttResponse)(nil),
-		(*ChatResponse_TtsResponse)(nil),
-		(*ChatResponse_EmotionResponse)(nil),
-		(*ChatResponse_AudioResponse)(nil),
-		(*ChatResponse_ErrorResponse)(nil),
-		(*ChatResponse_StatusResponse)(nil),
-	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ai_service_proto_rawDesc), len(file_ai_service_proto_rawDesc)),
-			NumEnums:      3,
-			NumMessages:   24,
+			NumEnums:      1,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -47,6 +47,12 @@ func main() {
 	}
 	logger.Info("gRPC客户端已启动")
 
+	// 启动消息路由器
+	if err := messageRouter.Start(ctx); err != nil {
+		log.Fatalf("启动消息路由器失败: %v", err)
+	}
+	logger.Info("消息路由器已启动")
+
 	// 创建WebSocket处理器
 	wsHandler := handler.NewWebSocketHandler(connectionManager, grpcClient, messageRouter, jwtManager, logger)
 
