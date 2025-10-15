@@ -24,10 +24,11 @@ func NewDeviceBindDB() *DeviceBindDB {
 func (d *DeviceBindDB) SaveDeviceBind(deviceID string, userID uint, bindKey string) error {
 	// 检查设备是否已经绑定
 	var existingBind models.DeviceBind
-	err := d.db.Where("device_id = ? AND is_active = ?", deviceID, true).First(&existingBind).Error
+	err := d.db.Where("device_id = ? ", deviceID).First(&existingBind).Error
 	if err == nil {
 		// 设备已绑定，更新绑定信息
 		existingBind.BindKey = bindKey
+		existingBind.IsActive = true
 		existingBind.UpdateAt = time.Now()
 		return d.db.Save(&existingBind).Error
 	} else if err != gorm.ErrRecordNotFound {

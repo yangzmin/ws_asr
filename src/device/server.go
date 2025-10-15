@@ -83,61 +83,60 @@ func (s *DefaultDeviceService) handleDeviceOptions(c *gin.Context) {
 func (s *DefaultDeviceService) handleDeviceRefToken(c *gin.Context) {
 	s.addCORSHeaders(c)
 
-	// 验证认证
-	authHeader := c.GetHeader("Authorization")
-	if !strings.HasPrefix(authHeader, "Bearer ") {
-		s.respondError(c, http.StatusUnauthorized, "无效的认证token或token已过期")
-		return
-	}
-
-	token := authHeader[7:] // 移除"Bearer "前缀
-
 	// 获取get请求参数
-	deviceID := c.Query("deviceID")
+	deviceID := c.Query("device_id")
 	if deviceID == "" {
 		s.respondError(c, http.StatusBadRequest, "设备ID不能为空")
 		return
 	}
 
+	token := c.Query("token")
+	if token == "" {
+		s.respondError(c, http.StatusBadRequest, "token不能为空")
+		return
+	}
+
+	bindKey := c.Query("bind_key")
+	if bindKey == "" {
+		s.respondError(c, http.StatusBadRequest, "bind_key不能为空")
+		return
+	}
+
+	deviceInfo, err := s.deviceDB.GetDeviceBind(deviceID)
+	if err != nil {
+		s.respondError(c, http.StatusInternalServerError, "设备不存在")
+		return
+	}
+
+	// 验证绑定密钥
+	if deviceInfo.BindKey != bindKey {
+		s.respondError(c, http.StatusInternalServerError, "绑定密钥验证失败")
+		return
+	}
+
 	// 使用Casbin进行JWT token验证
-	claims, err := casbin.ParseToken(token)
+
+	_, tokenDeviceID, tokenUserID, err := s.authToken.VerifyToken(token, true)
 	if err != nil {
-		s.respondError(c, http.StatusUnauthorized, "token验证失败: "+err.Error())
+		s.respondError(c, http.StatusInternalServerError, "token验证失败: "+err.Error())
 		return
 	}
 
-	// 从claims中获取用户ID和设备ID
-	userID := uint(claims.UserID)
-	deviceID := claims.DeviceID
-
-	// 验证设备ID格式
-	if !ValidateDeviceID(deviceID) {
-		s.respondError(c, http.StatusBadRequest, "设备ID格式无效")
-		return
-	}
-
-	// 检查设备是否已绑定
-	exists, err := s.deviceDB.IsDeviceBound(deviceID)
-	if err != nil {
-		s.logger.Error("检查设备绑定失败: %v", err)
-		s.respondError(c, http.StatusInternalServerError, "检查设备绑定失败")
-		return
-	}
-	if !exists {
-		s.respondError(c, http.StatusBadRequest, "设备未绑定")
+	if tokenDeviceID != deviceID && tokenUserID != deviceInfo.UserID {
+		s.respondError(c, http.StatusInternalServerError, "token设备ID与请求设备ID不匹配")
 		return
 	}
 
 	// 生成新的7天有效期token
 	sevenDays := 7 * 24 * time.Hour
-	newToken, err := s.authToken.GenerateTokenWithExpiry(userID, deviceID, sevenDays)
+	newToken, err := s.authToken.GenerateTokenWithExpiry(deviceInfo.UserID, deviceID, sevenDays)
 	if err != nil {
 		s.logger.Error("生成新token失败: %v", err)
 		s.respondError(c, http.StatusInternalServerError, "生成新token失败")
 		return
 	}
 
-	s.logger.Info("刷新设备token成功 - 用户ID: %d, 设备ID: %s", userID, deviceID)
+	s.logger.Info("刷新设备token成功 - 用户ID: %d, 设备ID: %s", deviceInfo.UserID, deviceID)
 
 	// 返回成功响应
 	response := RefreshTokenResponse{
@@ -206,7 +205,7 @@ func (s *DefaultDeviceService) handleDeviceBind(c *gin.Context) {
 	}
 
 	// 生成绑定密钥，使用HMAC(device_id, server_secret)算法
-	bindKey := GenerateBindKey(body.DeviceID, s.config.Server.Token)
+	bindKey := GenerateBindKey(body.DeviceID, s.config.Server.Token, userID)
 
 	// 生成7天有效期的token
 	sevenDays := 7 * 24 * time.Hour

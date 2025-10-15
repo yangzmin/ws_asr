@@ -52,7 +52,8 @@ func (at *AuthToken) GenerateTokenWithExpiry(userID uint, deviceID string, expir
 	return tokenString, nil
 }
 
-func (at *AuthToken) VerifyToken(tokenString string) (bool, string, uint, error) {
+// 校验设备token
+func (at *AuthToken) VerifyToken(tokenString string, ignoreExpiry ...bool) (bool, string, uint, error) {
 	if at == nil {
 		return false, "", 0, errors.New("AuthToken instance is nil")
 	}
@@ -61,21 +62,39 @@ func (at *AuthToken) VerifyToken(tokenString string) (bool, string, uint, error)
 		return false, "", 0, errors.New("secret key is not initialized")
 	}
 
+	// 默认需要验证过期时间
+	skipExpiry := false
+	if len(ignoreExpiry) > 0 {
+		skipExpiry = ignoreExpiry[0]
+	}
+
 	// 解析token
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+	parser := jwt.NewParser()
+	if skipExpiry {
+		parser = jwt.NewParser(jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
+	}
+
+	token, err := parser.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		// 验证签名方法
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return at.secretKey, nil
 	})
-	if err != nil {
+	if err != nil && !skipExpiry {
 		return false, "", 0, fmt.Errorf("failed to parse token: %w", err)
 	}
 
-	// 验证token是否有效
-	if !token.Valid {
-		return false, "", 0, errors.New("invalid token")
+	// 如果忽略过期，则只检查签名是否有效
+	if skipExpiry {
+		if token == nil {
+			return false, "", 0, errors.New("failed to parse token")
+		}
+	} else {
+		// 验证token是否有效
+		if !token.Valid {
+			return false, "", 0, errors.New("invalid token")
+		}
 	}
 
 	// 获取claims

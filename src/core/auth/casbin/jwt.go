@@ -20,8 +20,9 @@ var (
 type JWTClaims struct {
 	jwt.StandardClaims
 
-	UserID int    `json:"user_id"`
-	Role   string `json:"role,omitempty"`
+	UserID   int    `json:"user_id"`
+	DeviceID string `json:"device_id"`
+	Role     string `json:"role"`
 }
 
 func Init(c *configs.Config) error {
@@ -41,7 +42,7 @@ func Init(c *configs.Config) error {
 	return nil
 }
 
-// ParseToken 解析JWT
+// ParseToken 解析JWT 校验am token
 func ParseToken(tokenString string) (*JWTClaims, error) {
 	// 解析token
 	token, err := jwt.ParseWithClaims(
