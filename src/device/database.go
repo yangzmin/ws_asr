@@ -68,8 +68,8 @@ func (d *DeviceBindDB) IsDeviceBound(deviceID string) (bool, error) {
 }
 
 // UnbindDevice 解绑设备
-func (d *DeviceBindDB) UnbindDevice(deviceID string) error {
-	return d.db.Model(&models.DeviceBind{}).Where("device_id = ?", deviceID).Update("is_active", false).Error
+func (d *DeviceBindDB) UnbindDevice(deviceID string, bindKey string) error {
+	return d.db.Model(&models.DeviceBind{}).Where("device_id = ? AND bind_key = ?", deviceID, bindKey).Update("is_active", false).Error
 }
 
 // GetUserDevices 获取用户绑定的所有设备

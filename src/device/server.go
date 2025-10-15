@@ -42,6 +42,8 @@ func (s *DefaultDeviceService) Start(ctx context.Context, engine *gin.Engine, ap
 	apiGroup.OPTIONS("/device/", s.handleDeviceOptions)
 	apiGroup.POST("/device/bind", s.handleDeviceBind)
 	apiGroup.POST("/device/unbind", s.handleDeviceUnbind)
+	// 刷新token
+	apiGroup.GET("/device/refreshToken", s.handleDeviceRefToken)
 
 	// engine.GET("/device_bin/:filename", handleDeviceBinDownload)
 
@@ -66,6 +68,83 @@ func (s *DefaultDeviceService) addCORSHeaders(c *gin.Context) {
 func (s *DefaultDeviceService) handleDeviceOptions(c *gin.Context) {
 	s.addCORSHeaders(c)
 	c.Status(http.StatusOK)
+}
+
+// @Summary 刷新token
+// @Description 刷新设备的JWT token
+// @Tags Device
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer <UserJWT>"
+// @Param body body BindDeviceRequest true "请求体"
+// @Success 200 {object} RefreshTokenResponse
+// @Failure 400 {object} ErrorResponse
+// @Router /device/refreshToken [get]
+func (s *DefaultDeviceService) handleDeviceRefToken(c *gin.Context) {
+	s.addCORSHeaders(c)
+
+	// 验证认证
+	authHeader := c.GetHeader("Authorization")
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		s.respondError(c, http.StatusUnauthorized, "无效的认证token或token已过期")
+		return
+	}
+
+	token := authHeader[7:] // 移除"Bearer "前缀
+
+	// 获取get请求参数
+	deviceID := c.Query("deviceID")
+	if deviceID == "" {
+		s.respondError(c, http.StatusBadRequest, "设备ID不能为空")
+		return
+	}
+
+	// 使用Casbin进行JWT token验证
+	claims, err := casbin.ParseToken(token)
+	if err != nil {
+		s.respondError(c, http.StatusUnauthorized, "token验证失败: "+err.Error())
+		return
+	}
+
+	// 从claims中获取用户ID和设备ID
+	userID := uint(claims.UserID)
+	deviceID := claims.DeviceID
+
+	// 验证设备ID格式
+	if !ValidateDeviceID(deviceID) {
+		s.respondError(c, http.StatusBadRequest, "设备ID格式无效")
+		return
+	}
+
+	// 检查设备是否已绑定
+	exists, err := s.deviceDB.IsDeviceBound(deviceID)
+	if err != nil {
+		s.logger.Error("检查设备绑定失败: %v", err)
+		s.respondError(c, http.StatusInternalServerError, "检查设备绑定失败")
+		return
+	}
+	if !exists {
+		s.respondError(c, http.StatusBadRequest, "设备未绑定")
+		return
+	}
+
+	// 生成新的7天有效期token
+	sevenDays := 7 * 24 * time.Hour
+	newToken, err := s.authToken.GenerateTokenWithExpiry(userID, deviceID, sevenDays)
+	if err != nil {
+		s.logger.Error("生成新token失败: %v", err)
+		s.respondError(c, http.StatusInternalServerError, "生成新token失败")
+		return
+	}
+
+	s.logger.Info("刷新设备token成功 - 用户ID: %d, 设备ID: %s", userID, deviceID)
+
+	// 返回成功响应
+	response := RefreshTokenResponse{
+		Success: true,
+		Token:   newToken,
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 // @Summary 上传设备信息获取最新固件
@@ -111,6 +190,18 @@ func (s *DefaultDeviceService) handleDeviceBind(c *gin.Context) {
 	// 验证设备ID
 	if !ValidateDeviceID(body.DeviceID) {
 		s.respondError(c, http.StatusBadRequest, "设备ID格式无效")
+		return
+	}
+
+	// 是否绑定过设备
+	exists, err := s.deviceDB.IsDeviceBound(body.DeviceID)
+	if err != nil {
+		s.logger.Error("检查设备绑定失败: %v", err)
+		s.respondError(c, http.StatusInternalServerError, "检查设备绑定失败")
+		return
+	}
+	if exists {
+		s.respondError(c, http.StatusBadRequest, "设备已绑定")
 		return
 	}
 
@@ -183,8 +274,13 @@ func (s *DefaultDeviceService) handleDeviceUnbind(c *gin.Context) {
 		return
 	}
 
+	if existingBind.BindKey != body.BindKey {
+		s.respondUnbindError(c, http.StatusBadRequest, "绑定key错误")
+		return
+	}
+
 	// 执行解绑操作
-	if err := s.deviceDB.UnbindDevice(body.DeviceID); err != nil {
+	if err := s.deviceDB.UnbindDevice(body.DeviceID, body.BindKey); err != nil {
 		s.logger.Error("设备解绑失败: %v", err)
 		s.respondUnbindError(c, http.StatusInternalServerError, "解绑操作失败")
 		return
