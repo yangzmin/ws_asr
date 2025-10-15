@@ -1,4 +1,4 @@
-module xiaozhi-server-go
+module angrymiao-ai-server
 
 go 1.24.5
 

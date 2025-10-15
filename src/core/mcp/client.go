@@ -1,12 +1,12 @@
 package mcp
 
 import (
+	"angrymiao-ai-server/src/core/types"
+	"angrymiao-ai-server/src/core/utils"
 	"context"
 	"fmt"
 	"sync"
 	"time"
-	"xiaozhi-server-go/src/core/types"
-	"xiaozhi-server-go/src/core/utils"
 
 	mcpclient "github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/client/transport"

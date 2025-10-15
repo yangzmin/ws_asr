@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"xiaozhi-server-go/src/core/providers/asr"
-	"xiaozhi-server-go/src/core/utils"
+	"angrymiao-ai-server/src/core/providers/asr"
+	"angrymiao-ai-server/src/core/utils"
 
 	"github.com/gorilla/websocket"
 )

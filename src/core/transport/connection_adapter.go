@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"sync/atomic"
 
-	"xiaozhi-server-go/src/configs"
-	"xiaozhi-server-go/src/core"
-	"xiaozhi-server-go/src/core/pool"
-	"xiaozhi-server-go/src/core/utils"
-	"xiaozhi-server-go/src/services"
-	"xiaozhi-server-go/src/task"
+	"angrymiao-ai-server/src/configs"
+	"angrymiao-ai-server/src/core"
+	"angrymiao-ai-server/src/core/pool"
+	"angrymiao-ai-server/src/core/utils"
+	"angrymiao-ai-server/src/services"
+	"angrymiao-ai-server/src/task"
 )
 
 // ConnectionContextAdapter 连接上下文适配器，完全兼容现有的ConnectionContext逻辑

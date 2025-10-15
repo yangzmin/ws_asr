@@ -1,6 +1,8 @@
 package image
 
 import (
+	"angrymiao-ai-server/src/configs"
+	"angrymiao-ai-server/src/core/utils"
 	"context"
 	"encoding/base64"
 	"fmt"
@@ -11,8 +13,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
-	"xiaozhi-server-go/src/configs"
-	"xiaozhi-server-go/src/core/utils"
 
 	"github.com/google/uuid"
 )

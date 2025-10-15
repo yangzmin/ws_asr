@@ -1,17 +1,17 @@
 package pool
 
 import (
+	"angrymiao-ai-server/src/configs"
+	"angrymiao-ai-server/src/core/image"
+	"angrymiao-ai-server/src/core/providers"
+	"angrymiao-ai-server/src/core/providers/vlllm"
+	"angrymiao-ai-server/src/core/utils"
 	"context"
 	"encoding/base64"
 	"fmt"
 	"math"
 	"strings"
 	"time"
-	"xiaozhi-server-go/src/configs"
-	"xiaozhi-server-go/src/core/image"
-	"xiaozhi-server-go/src/core/providers"
-	"xiaozhi-server-go/src/core/providers/vlllm"
-	"xiaozhi-server-go/src/core/utils"
 )
 
 // CheckMode 检查模式

@@ -1,11 +1,11 @@
 package auth
 
 import (
+	"angrymiao-ai-server/src/core/auth/store"
+	"angrymiao-ai-server/src/core/utils"
 	"fmt"
 	"sync"
 	"time"
-	"xiaozhi-server-go/src/core/auth/store"
-	"xiaozhi-server-go/src/core/utils"
 )
 
 // AuthManager 认证管理器

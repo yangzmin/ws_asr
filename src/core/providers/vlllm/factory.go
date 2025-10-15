@@ -3,8 +3,8 @@ package vlllm
 import (
 	"fmt"
 
-	"xiaozhi-server-go/src/configs"
-	"xiaozhi-server-go/src/core/utils"
+	"angrymiao-ai-server/src/configs"
+	"angrymiao-ai-server/src/core/utils"
 )
 
 // Factory VLLLM工厂函数类型

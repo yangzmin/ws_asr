@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"xiaozhi-server-go/src/models"
+	"angrymiao-ai-server/src/models"
 
 	"gorm.io/gorm"
 )

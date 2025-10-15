@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"xiaozhi-server-go/src/configs"
-	"xiaozhi-server-go/src/core/image"
-	"xiaozhi-server-go/src/core/providers"
-	"xiaozhi-server-go/src/core/utils"
+	"angrymiao-ai-server/src/configs"
+	"angrymiao-ai-server/src/core/image"
+	"angrymiao-ai-server/src/core/providers"
+	"angrymiao-ai-server/src/core/utils"
 
 	"github.com/sashabaranov/go-openai"
 )

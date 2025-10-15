@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"time"
 
-	"xiaozhi-server-go/src/configs"
+	"angrymiao-ai-server/src/configs"
 
 	"github.com/golang-jwt/jwt/v4"
 )

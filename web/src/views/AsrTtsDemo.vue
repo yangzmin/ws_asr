@@ -2261,7 +2261,7 @@ const formatTime = (date) => {
 
 /**
  * 处理 MCP 消息
- * 注意：服务端(xiaozhi-server-go)是 MCP 客户端，设备端是 MCP 服务器
+ * 注意：服务端(angrymiao-ai-server)是 MCP 客户端，设备端是 MCP 服务器
  */
 const handleMcpMessage = (message) => {
   console.log('收到MCP消息:', message)

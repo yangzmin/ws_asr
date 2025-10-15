@@ -6,14 +6,14 @@ import (
 	"strings"
 	"time"
 
-	"xiaozhi-server-go/src/configs"
-	"xiaozhi-server-go/src/models"
+	"angrymiao-ai-server/src/configs"
+	"angrymiao-ai-server/src/models"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	xiaozhi_utils "xiaozhi-server-go/src/core/utils"
+	xiaozhi_utils "angrymiao-ai-server/src/core/utils"
 
 	gorm_logger "gorm.io/gorm/logger"
 )

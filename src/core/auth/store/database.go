@@ -1,10 +1,10 @@
 package store
 
 import (
+	"angrymiao-ai-server/src/configs/database"
+	"angrymiao-ai-server/src/models"
 	"encoding/json"
 	"time"
-	"xiaozhi-server-go/src/configs/database"
-	"xiaozhi-server-go/src/models"
 
 	"gorm.io/gorm"
 )

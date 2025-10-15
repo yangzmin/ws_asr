@@ -1,6 +1,7 @@
 package deepgram
 
 import (
+	"angrymiao-ai-server/src/core/providers/tts"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -8,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-	"xiaozhi-server-go/src/core/providers/tts"
 
 	"github.com/gorilla/websocket"
 )

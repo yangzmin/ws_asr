@@ -1,11 +1,11 @@
 package mcp
 
 import (
+	"angrymiao-ai-server/src/configs"
+	"angrymiao-ai-server/src/core/utils"
 	"context"
 	"fmt"
 	"sync"
-	"xiaozhi-server-go/src/configs"
-	"xiaozhi-server-go/src/core/utils"
 
 	"github.com/sashabaranov/go-openai"
 )

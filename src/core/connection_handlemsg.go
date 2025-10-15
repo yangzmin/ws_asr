@@ -1,14 +1,14 @@
 package core
 
 import (
+	"angrymiao-ai-server/src/core/chat"
+	"angrymiao-ai-server/src/core/image"
+	"angrymiao-ai-server/src/core/providers"
+	"angrymiao-ai-server/src/core/utils"
 	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
-	"xiaozhi-server-go/src/core/chat"
-	"xiaozhi-server-go/src/core/image"
-	"xiaozhi-server-go/src/core/providers"
-	"xiaozhi-server-go/src/core/utils"
 )
 
 // handleMessage 处理接收到的消息

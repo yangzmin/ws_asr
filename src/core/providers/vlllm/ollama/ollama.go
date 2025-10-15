@@ -1,8 +1,8 @@
 package ollama
 
 import (
-	"xiaozhi-server-go/src/core/providers/vlllm"
-	"xiaozhi-server-go/src/core/utils"
+	"angrymiao-ai-server/src/core/providers/vlllm"
+	"angrymiao-ai-server/src/core/utils"
 )
 
 // OllamaVLLMProvider Ollama类型的VLLLM提供者

@@ -1,11 +1,11 @@
 package mcp
 
 import (
+	"angrymiao-ai-server/src/configs"
+	"angrymiao-ai-server/src/core/types"
 	"context"
 	"strings"
 	"time"
-	"xiaozhi-server-go/src/configs"
-	"xiaozhi-server-go/src/core/types"
 )
 
 func (c *LocalClient) AddToolExit() error {

@@ -1,8 +1,8 @@
 package llm
 
 import (
+	"angrymiao-ai-server/src/core/types"
 	"fmt"
-	"xiaozhi-server-go/src/core/types"
 )
 
 // Config LLM配置结构

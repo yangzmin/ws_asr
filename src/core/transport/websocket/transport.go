@@ -7,12 +7,12 @@ import (
 	"strings"
 	"sync"
 
-	"xiaozhi-server-go/src/configs"
-	"xiaozhi-server-go/src/core/auth"
-	"xiaozhi-server-go/src/core/transport"
-	"xiaozhi-server-go/src/core/utils"
-	"xiaozhi-server-go/src/models"
-	"xiaozhi-server-go/src/services"
+	"angrymiao-ai-server/src/configs"
+	"angrymiao-ai-server/src/core/auth"
+	"angrymiao-ai-server/src/core/transport"
+	"angrymiao-ai-server/src/core/utils"
+	"angrymiao-ai-server/src/models"
+	"angrymiao-ai-server/src/services"
 
 	"github.com/gorilla/websocket"
 )

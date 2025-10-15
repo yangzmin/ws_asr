@@ -3,8 +3,8 @@ package chat
 import (
 	"encoding/json"
 
-	"xiaozhi-server-go/src/core/types"
-	"xiaozhi-server-go/src/core/utils"
+	"angrymiao-ai-server/src/core/types"
+	"angrymiao-ai-server/src/core/utils"
 )
 
 type Message = types.Message

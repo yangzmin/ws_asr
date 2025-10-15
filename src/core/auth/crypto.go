@@ -1,12 +1,12 @@
 package auth
 
 import (
+	"angrymiao-ai-server/src/core/utils"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"sync"
 	"time"
-	"xiaozhi-server-go/src/core/utils"
 )
 
 // SessionKeys 会话密钥结构

@@ -1,12 +1,12 @@
 package tts
 
 import (
+	"angrymiao-ai-server/src/configs"
+	"angrymiao-ai-server/src/core/providers"
+	"angrymiao-ai-server/src/core/utils"
 	"fmt"
 	"os"
 	"path/filepath"
-	"xiaozhi-server-go/src/configs"
-	"xiaozhi-server-go/src/core/providers"
-	"xiaozhi-server-go/src/core/utils"
 )
 
 // Config TTS配置结构

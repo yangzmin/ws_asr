@@ -1,10 +1,10 @@
 package transport
 
 import (
+	"angrymiao-ai-server/src/configs"
+	"angrymiao-ai-server/src/core/utils"
 	"context"
 	"sync"
-	"xiaozhi-server-go/src/configs"
-	"xiaozhi-server-go/src/core/utils"
 )
 
 // TransportManager 传输管理器

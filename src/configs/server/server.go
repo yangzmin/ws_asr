@@ -1,9 +1,9 @@
 package server
 
 import (
+	"angrymiao-ai-server/src/configs"
+	"angrymiao-ai-server/src/core/utils"
 	"context"
-	"xiaozhi-server-go/src/configs"
-	"xiaozhi-server-go/src/core/utils"
 
 	"github.com/gin-gonic/gin"
 )

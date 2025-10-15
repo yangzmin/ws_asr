@@ -1,16 +1,17 @@
 package coze
 
 import (
+	"angrymiao-ai-server/src/core/providers/llm"
+	"angrymiao-ai-server/src/core/types"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/coze-dev/coze-go"
-	"github.com/sashabaranov/go-openai"
 	"io"
 	"sync"
-	"xiaozhi-server-go/src/core/providers/llm"
-	"xiaozhi-server-go/src/core/types"
+
+	"github.com/coze-dev/coze-go"
+	"github.com/sashabaranov/go-openai"
 )
 
 type Provider struct {

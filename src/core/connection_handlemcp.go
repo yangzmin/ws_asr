@@ -1,11 +1,11 @@
 package core
 
 import (
+	"angrymiao-ai-server/src/core/types"
+	"angrymiao-ai-server/src/core/utils"
+	"angrymiao-ai-server/src/vision"
 	"context"
 	"encoding/json"
-	"xiaozhi-server-go/src/core/types"
-	"xiaozhi-server-go/src/core/utils"
-	"xiaozhi-server-go/src/vision"
 )
 
 func (h *ConnectionHandler) initMCPResultHandlers() {

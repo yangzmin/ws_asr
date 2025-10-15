@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"xiaozhi-server-go/src/core/utils"
-	"xiaozhi-server-go/src/models"
+	"angrymiao-ai-server/src/core/utils"
+	"angrymiao-ai-server/src/models"
 
 	"gorm.io/datatypes"
 	"gorm.io/gorm"

@@ -1,11 +1,11 @@
 package core
 
 import (
+	"angrymiao-ai-server/src/core/utils"
 	"encoding/json"
 	"fmt"
 	"sync/atomic"
 	"time"
-	"xiaozhi-server-go/src/core/utils"
 )
 
 // sendHelloMessage 发送欢迎消息

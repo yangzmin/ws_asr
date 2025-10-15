@@ -1,14 +1,14 @@
 package pool
 
 import (
+	"angrymiao-ai-server/src/configs"
+	"angrymiao-ai-server/src/core/mcp"
+	"angrymiao-ai-server/src/core/providers"
+	"angrymiao-ai-server/src/core/providers/vlllm"
+	"angrymiao-ai-server/src/core/utils"
 	"context"
 	"fmt"
 	"time"
-	"xiaozhi-server-go/src/configs"
-	"xiaozhi-server-go/src/core/mcp"
-	"xiaozhi-server-go/src/core/providers"
-	"xiaozhi-server-go/src/core/providers/vlllm"
-	"xiaozhi-server-go/src/core/utils"
 )
 
 // PoolManager 资源池管理器

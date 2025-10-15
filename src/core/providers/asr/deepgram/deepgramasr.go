@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"xiaozhi-server-go/src/core/providers/asr"
-	"xiaozhi-server-go/src/core/utils"
+	"angrymiao-ai-server/src/core/providers/asr"
+	"angrymiao-ai-server/src/core/utils"
 
 	"github.com/gorilla/websocket"
 )
@@ -297,11 +297,11 @@ func (p *Provider) ReadMessage() {
 										return
 									}
 								}
-							// } else if p.interim {
-							// 	// For interim results, notify listener but don't update final result
-							// 	if listener := p.BaseProvider.GetListener(); listener != nil {
-							// 		listener.OnAsrInterimResult(transcript)
-							// 	}
+								// } else if p.interim {
+								// 	// For interim results, notify listener but don't update final result
+								// 	if listener := p.BaseProvider.GetListener(); listener != nil {
+								// 		listener.OnAsrInterimResult(transcript)
+								// 	}
 							}
 						}
 					}

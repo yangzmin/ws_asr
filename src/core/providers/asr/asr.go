@@ -1,11 +1,11 @@
 package asr
 
 import (
+	"angrymiao-ai-server/src/core/providers"
+	"angrymiao-ai-server/src/core/utils"
 	"bytes"
 	"fmt"
 	"time"
-	"xiaozhi-server-go/src/core/providers"
-	"xiaozhi-server-go/src/core/utils"
 )
 
 // Config ASR配置结构

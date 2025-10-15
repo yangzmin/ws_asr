@@ -1,11 +1,12 @@
 package gosherpa
 
 import (
+	"angrymiao-ai-server/src/core/providers/asr"
+	"angrymiao-ai-server/src/core/utils"
 	"context"
-	"github.com/gorilla/websocket"
 	"time"
-	"xiaozhi-server-go/src/core/providers/asr"
-	"xiaozhi-server-go/src/core/utils"
+
+	"github.com/gorilla/websocket"
 )
 
 type Provider struct {

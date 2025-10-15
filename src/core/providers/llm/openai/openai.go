@@ -1,10 +1,10 @@
 package openai
 
 import (
+	"angrymiao-ai-server/src/core/providers/llm"
+	"angrymiao-ai-server/src/core/types"
 	"context"
 	"fmt"
-	"xiaozhi-server-go/src/core/providers/llm"
-	"xiaozhi-server-go/src/core/types"
 
 	"github.com/sashabaranov/go-openai"
 )
