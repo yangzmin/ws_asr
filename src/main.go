@@ -20,6 +20,7 @@ import (
 	"xiaozhi-server-go/src/core/auth"
 	"xiaozhi-server-go/src/core/auth/casbin"
 	"xiaozhi-server-go/src/core/auth/store"
+	"xiaozhi-server-go/src/core/eventbus"
 	"xiaozhi-server-go/src/core/pool"
 	"xiaozhi-server-go/src/core/transport"
 	"xiaozhi-server-go/src/core/transport/websocket"
@@ -127,14 +128,27 @@ func StartTransportServer(
 	// 创建传输管理器
 	transportManager := transport.NewTransportManager(config, logger)
 
-	// 创建连接处理器工厂
-	handlerFactory := transport.NewDefaultConnectionHandlerFactory(
-		config,
-		poolManager,
-		taskMgr,
-		logger,
-		userConfigService,
-	)
+	// 创建连接处理器工厂（根据配置选择事件总线或默认模式）
+	var handlerFactory transport.ConnectionHandlerFactory
+	if config.EventBus.Enabled {
+		logger.Info("启用事件总线连接处理器模式")
+		handlerFactory = transport.NewEventBusConnectionHandlerFactory(
+			config,
+			poolManager,
+			taskMgr,
+			logger,
+			userConfigService,
+		)
+	} else {
+		logger.Info("使用默认连接处理器模式")
+		handlerFactory = transport.NewDefaultConnectionHandlerFactory(
+			config,
+			poolManager,
+			taskMgr,
+			logger,
+			userConfigService,
+		)
+	}
 
 	// 根据配置启用不同的传输层
 	enabledTransports := make([]string, 0)
@@ -240,6 +254,20 @@ func StartHttpServer(config *configs.Config, logger *utils.Logger, g *errgroup.G
 	aiConfigHandler := handlers.NewAIConfigHandler(db, logger)
 	aiConfigHandler.RegisterRoutes(apiGroup)
 	logger.Info("AI配置管理服务已注册，访问地址: /api/ai-configs")
+
+	// 启动EventBus API服务
+	// 初始化EventBus管理器
+	eventBusManager := eventbus.NewEventBusManager(nil)
+	
+	// 启动EventBus管理器（这会初始化监控服务）
+	if err := eventBusManager.Start(); err != nil {
+		logger.Error("Failed to start EventBus manager", "error", err)
+	}
+	
+	// 创建EventBus处理器并注册路由
+	eventBusHandler := handlers.NewEventBusHandler(eventBusManager, eventBusManager.GetMonitor(), logger)
+	eventBusHandler.RegisterRoutes(apiGroup)
+	logger.Info("EventBus API服务已注册，访问地址: /api/event-bus/*, /api/services/*, /api/config/*")
 
 	// 注册ASR文档路由
 	// RegisterASRDocsRoutes(apiGroup)

@@ -13,6 +13,7 @@ import (
 
 // handleMessage 处理接收到的消息
 func (h *ConnectionHandler) handleMessage(messageType int, message []byte) error {
+	fmt.Println("handleMessage:", messageType, string(message))
 	switch messageType {
 	case 1: // 文本消息
 		h.clientTextQueue <- string(message)

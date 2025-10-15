@@ -72,6 +72,47 @@ type Config struct {
 		} `yaml:"websocket" json:"websocket"`
 	} `yaml:"transport" json:"transport"`
 
+	// 事件总线解耦配置
+	EventBus struct {
+		Enabled bool `yaml:"enabled" json:"enabled"` // 是否启用事件总线解耦架构
+		Bus     struct {
+			BufferSize  int `yaml:"buffer_size" json:"buffer_size"`   // 事件队列缓冲区大小
+			Timeout     int `yaml:"timeout" json:"timeout"`           // 事件处理超时时间(秒)
+			WorkerCount int `yaml:"worker_count" json:"worker_count"` // 事件处理器数量
+		} `yaml:"bus" json:"bus"`
+		Adapters struct {
+			ASR struct {
+				Enabled    bool `yaml:"enabled" json:"enabled"`
+				Timeout    int  `yaml:"timeout" json:"timeout"`
+				RetryCount int  `yaml:"retry_count" json:"retry_count"`
+			} `yaml:"asr" json:"asr"`
+			LLM struct {
+				Enabled    bool `yaml:"enabled" json:"enabled"`
+				Timeout    int  `yaml:"timeout" json:"timeout"`
+				RetryCount int  `yaml:"retry_count" json:"retry_count"`
+			} `yaml:"llm" json:"llm"`
+			TTS struct {
+				Enabled    bool `yaml:"enabled" json:"enabled"`
+				Timeout    int  `yaml:"timeout" json:"timeout"`
+				RetryCount int  `yaml:"retry_count" json:"retry_count"`
+			} `yaml:"tts" json:"tts"`
+			MCP struct {
+				Enabled    bool `yaml:"enabled" json:"enabled"`
+				Timeout    int  `yaml:"timeout" json:"timeout"`
+				RetryCount int  `yaml:"retry_count" json:"retry_count"`
+			} `yaml:"mcp" json:"mcp"`
+		} `yaml:"adapters" json:"adapters"`
+		Session struct {
+			Timeout         int `yaml:"timeout" json:"timeout"`                   // 会话超时时间(分钟)
+			CleanupInterval int `yaml:"cleanup_interval" json:"cleanup_interval"` // 会话清理间隔(分钟)
+		} `yaml:"session" json:"session"`
+		Monitoring struct {
+			Enabled         bool `yaml:"enabled" json:"enabled"`                   // 是否启用监控
+			RetentionHours  int  `yaml:"retention_hours" json:"retention_hours"`   // 监控数据保留时间(小时)
+			MetricsInterval int  `yaml:"metrics_interval" json:"metrics_interval"` // 性能指标采集间隔(秒)
+		} `yaml:"monitoring" json:"monitoring"`
+	} `yaml:"eventbus" json:"eventbus"`
+
 	Log struct {
 		LogFormat string `yaml:"log_format" json:"log_format"`
 		LogLevel  string `yaml:"log_level" json:"log_level"`

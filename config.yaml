@@ -26,6 +26,55 @@ transport:
     ip: "0.0.0.0"
     port: 8000
 
+# 事件总线解耦配置
+eventbus:
+  # 是否启用事件总线解耦架构
+  enabled: true
+  # 事件总线配置
+  bus:
+    # 事件队列缓冲区大小
+    buffer_size: 1000
+    # 事件处理超时时间(秒)
+    timeout: 30
+    # 事件处理器数量
+    worker_count: 4
+  # 服务适配器配置
+  adapters:
+    # ASR服务适配器
+    asr:
+      enabled: true
+      timeout: 10
+      retry_count: 3
+    # LLM服务适配器
+    llm:
+      enabled: true
+      timeout: 60
+      retry_count: 2
+    # TTS服务适配器
+    tts:
+      enabled: true
+      timeout: 30
+      retry_count: 3
+    # MCP服务适配器
+    mcp:
+      enabled: true
+      timeout: 20
+      retry_count: 2
+  # 会话管理配置
+  session:
+    # 会话超时时间(分钟)
+    timeout: 30
+    # 会话清理间隔(分钟)
+    cleanup_interval: 5
+  # 监控配置
+  monitoring:
+    # 是否启用监控
+    enabled: true
+    # 监控数据保留时间(小时)
+    retention_hours: 24
+    # 性能指标采集间隔(秒)
+    metrics_interval: 10
+
 casbin:
   jwt:
     key: Bearer
