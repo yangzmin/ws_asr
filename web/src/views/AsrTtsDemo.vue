@@ -2320,7 +2320,7 @@ const handleMcpInitializeRequest = (payload) => {
           logging: {}
         },
         serverInfo: {
-          name: 'xiaozhi-device',
+          name: 'angrymiao-device',
           version: '1.0.0'
         }
       }

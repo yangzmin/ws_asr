@@ -13,7 +13,7 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	xiaozhi_utils "angrymiao-ai-server/src/core/utils"
+	am_utils "angrymiao-ai-server/src/core/utils"
 
 	gorm_logger "gorm.io/gorm/logger"
 )
@@ -25,7 +25,7 @@ const (
 )
 
 type DBLogger struct {
-	logger *xiaozhi_utils.Logger
+	logger *am_utils.Logger
 }
 
 func (l *DBLogger) LogMode(level gorm_logger.LogLevel) gorm_logger.Interface {
@@ -76,7 +76,7 @@ func (l *DBLogger) Trace(
 
 var (
 	DB       *gorm.DB
-	dbLogger *xiaozhi_utils.Logger
+	dbLogger *am_utils.Logger
 )
 
 func GetDB() *gorm.DB {
@@ -145,7 +145,7 @@ func InitDB(config *configs.Config) (*gorm.DB, string, error) {
 }
 
 // SetLogger 设置数据库日志记录器并显示数据库版本信息
-func SetLogger(logger *xiaozhi_utils.Logger) {
+func SetLogger(logger *am_utils.Logger) {
 	dbLogger = logger
 	DB.Logger = &DBLogger{logger: logger}
 

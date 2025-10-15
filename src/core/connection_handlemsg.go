@@ -89,7 +89,7 @@ func (h *ConnectionHandler) processClientTextMessage(ctx context.Context, text s
 	case "image":
 		return h.handleImageMessage(ctx, msgMap)
 	case "mcp":
-		return h.mcpManager.HandleXiaoZhiMCPMessage(msgMap)
+		return h.mcpManager.HandleAMMCPMessage(msgMap)
 	default:
 		h.logger.Warn("=== 未知消息类型 ===", map[string]interface{}{
 			"unknown_type": msgType,

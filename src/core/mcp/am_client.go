@@ -23,8 +23,8 @@ const (
 	msgTypeText = 1 // 文本消息类型
 )
 
-// XiaoZhiMCPClient MCP客户端
-type XiaoZhiMCPClient struct {
+// AMMCPClient MCP客户端
+type AMMCPClient struct {
 	logger     *utils.Logger
 	conn       Conn
 	sessionID  string // 会话ID，用于标识连接
@@ -46,9 +46,9 @@ type XiaoZhiMCPClient struct {
 	toolNameMap map[string]string
 }
 
-// NewXiaoZhiMCPClient 创建一个新的MCP客户端
-func NewXiaoZhiMCPClient(logger *utils.Logger, conn Conn, sessionID string) *XiaoZhiMCPClient {
-	return &XiaoZhiMCPClient{
+// NewAMMCPClient 创建一个新的MCP客户端
+func NewAMMCPClient(logger *utils.Logger, conn Conn, sessionID string) *AMMCPClient {
+	return &AMMCPClient{
 		logger:      logger,
 		conn:        conn,
 		sessionID:   sessionID,
@@ -61,20 +61,20 @@ func NewXiaoZhiMCPClient(logger *utils.Logger, conn Conn, sessionID string) *Xia
 }
 
 // SetConnection 设置新的连接
-func (c *XiaoZhiMCPClient) SetConnection(conn Conn) {
+func (c *AMMCPClient) SetConnection(conn Conn) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.conn = conn
 }
 
-func (c *XiaoZhiMCPClient) SetID(deviceID string, clientID string) {
+func (c *AMMCPClient) SetID(deviceID string, clientID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.deviceID = deviceID
 	c.clientID = clientID // 使用clientID作为会话ID
 }
 
-func (c *XiaoZhiMCPClient) SetToken(token string) {
+func (c *AMMCPClient) SetToken(token string) {
 	auth := auth.NewAuthToken(token)
 	visionToken, err := auth.GenerateToken(c.deviceID)
 	if err != nil {
@@ -87,14 +87,14 @@ func (c *XiaoZhiMCPClient) SetToken(token string) {
 	c.token = visionToken
 }
 
-func (c *XiaoZhiMCPClient) SetVisionURL(visionURL string) {
+func (c *AMMCPClient) SetVisionURL(visionURL string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.visionURL = visionURL
 }
 
 // ResetConnection 重置连接状态
-func (c *XiaoZhiMCPClient) ResetConnection() error {
+func (c *AMMCPClient) ResetConnection() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -111,7 +111,7 @@ func (c *XiaoZhiMCPClient) ResetConnection() error {
 }
 
 // Start 启动MCP客户端
-func (c *XiaoZhiMCPClient) Start(ctx context.Context) error {
+func (c *AMMCPClient) Start(ctx context.Context) error {
 	c.mu.Lock()
 	c.ctx, c.cancelFunc = context.WithCancel(ctx)
 	c.mu.Unlock()
@@ -121,7 +121,7 @@ func (c *XiaoZhiMCPClient) Start(ctx context.Context) error {
 }
 
 // Stop 停止MCP客户端
-func (c *XiaoZhiMCPClient) Stop() {
+func (c *AMMCPClient) Stop() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -143,7 +143,7 @@ func (c *XiaoZhiMCPClient) Stop() {
 }
 
 // HasTool 检查是否有指定名称的工具（支持sanitized名称）
-func (c *XiaoZhiMCPClient) HasTool(name string) bool {
+func (c *AMMCPClient) HasTool(name string) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -167,7 +167,7 @@ func sanitizeToolName(name string) string {
 }
 
 // GetAvailableTools 获取所有可用工具
-func (c *XiaoZhiMCPClient) GetAvailableTools() []openai.Tool {
+func (c *AMMCPClient) GetAvailableTools() []openai.Tool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -190,7 +190,7 @@ func (c *XiaoZhiMCPClient) GetAvailableTools() []openai.Tool {
 }
 
 // CallTool 调用指定的工具
-func (c *XiaoZhiMCPClient) CallTool(
+func (c *AMMCPClient) CallTool(
 	ctx context.Context,
 	name string,
 	args map[string]interface{},
@@ -307,14 +307,14 @@ func (c *XiaoZhiMCPClient) CallTool(
 }
 
 // IsReady 检查客户端是否已初始化完成并准备就绪
-func (c *XiaoZhiMCPClient) IsReady() bool {
+func (c *AMMCPClient) IsReady() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.ready
 }
 
 // SendMCPInitializeMessage 发送MCP初始化消息
-func (c *XiaoZhiMCPClient) SendMCPInitializeMessage() error {
+func (c *AMMCPClient) SendMCPInitializeMessage() error {
 	// 构造MCP初始化消息
 	mcpMessage := map[string]interface{}{
 		"type":       "mcp",
@@ -353,7 +353,7 @@ func (c *XiaoZhiMCPClient) SendMCPInitializeMessage() error {
 }
 
 // SendMCPToolsListRequest 发送MCP工具列表请求
-func (c *XiaoZhiMCPClient) SendMCPToolsListRequest() error {
+func (c *AMMCPClient) SendMCPToolsListRequest() error {
 	// 构造MCP工具列表请求
 	mcpMessage := map[string]interface{}{
 		"type":       "mcp",
@@ -375,7 +375,7 @@ func (c *XiaoZhiMCPClient) SendMCPToolsListRequest() error {
 }
 
 // SendMCPToolsListContinueRequest 发送带有cursor的MCP工具列表请求
-func (c *XiaoZhiMCPClient) SendMCPToolsListContinueRequest(cursor string) error {
+func (c *AMMCPClient) SendMCPToolsListContinueRequest(cursor string) error {
 	// 构造MCP工具列表请求
 	mcpMessage := map[string]interface{}{
 		"type":       "mcp",
@@ -400,7 +400,7 @@ func (c *XiaoZhiMCPClient) SendMCPToolsListContinueRequest(cursor string) error 
 }
 
 // HandleMCPMessage 处理MCP消息
-func (c *XiaoZhiMCPClient) HandleMCPMessage(msgMap map[string]interface{}) error {
+func (c *AMMCPClient) HandleMCPMessage(msgMap map[string]interface{}) error {
 	// c.logger.Info("处理MCP消息: " + fmt.Sprintf("%v", msgMap))
 	// 获取payload
 	payload, ok := msgMap["payload"].(map[string]interface{})

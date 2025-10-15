@@ -181,7 +181,7 @@ func (p *ImageProcessor) downloadImage(ctx context.Context, url string, tempPath
 	}
 
 	// 设置User-Agent，避免被某些网站拒绝
-	req.Header.Set("User-Agent", "XiaoZhi-Image-Bot/1.0")
+	// req.Header.Set("User-Agent", "XiaoZhi-Image-Bot/1.0")
 
 	// 发送请求
 	resp, err := p.httpClient.Do(req)
