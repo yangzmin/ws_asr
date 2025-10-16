@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"angrymiao-ai-server/src/configs"
-	"angrymiao-ai-server/src/core/auth/casbin"
+	"angrymiao-ai-server/src/core/auth/am_token"
 	"angrymiao-ai-server/src/core/providers/llm"
 	"angrymiao-ai-server/src/core/types"
 	"angrymiao-ai-server/src/core/utils"
@@ -622,7 +622,7 @@ func (h *AIConfigHandler) authMiddleware() gin.HandlerFunc {
 		token := authHeader[7:] // 移除"Bearer "前缀
 
 		// 使用Casbin进行JWT token验证
-		claims, err := casbin.ParseToken(token)
+		claims, err := am_token.ParseToken(token)
 		if err != nil {
 			h.respondError(c, http.StatusUnauthorized, "token验证失败: "+err.Error(), err)
 			c.Abort()

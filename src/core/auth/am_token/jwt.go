@@ -1,12 +1,13 @@
-package casbin
+package am_token
 
 import (
 	"crypto/rsa"
 	"errors"
-	"io/ioutil"
 	"time"
 
 	"angrymiao-ai-server/src/configs"
+
+	"os"
 
 	"github.com/golang-jwt/jwt/v4"
 )
@@ -29,7 +30,7 @@ func Init(c *configs.Config) error {
 
 	issue = c.Casbin.JWT.Issuer
 
-	verifyBytes, err := ioutil.ReadFile(c.Casbin.JWT.PublicKeyPath)
+	verifyBytes, err := os.ReadFile(c.Casbin.JWT.PublicKeyPath)
 	if err != nil {
 		return err
 	}

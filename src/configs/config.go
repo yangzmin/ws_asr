@@ -229,31 +229,13 @@ func (cfg *Config) setDefaults() {
 
 }
 
-// LoadConfig 加载配置
-// 第一次从config.yaml加载，加载后存储到数据库加载
-// 如果数据库中已存在配置，则直接加载数据库中的配置
+// 从config.yaml加载
 func LoadConfig(dbi ConfigDBInterface) (*Config, string, error) {
-	// bUseDatabaseCfg := false
-	// 尝试从数据库加载配置
-	// cfgStr, err := dbi.LoadServerConfig()
-	// if err != nil {
-	// 	fmt.Println("加载服务器配置失败:", err)
-	// 	return nil, "", err
-	// }
-
 	config := &Config{}
-
 	path := "database:serverConfig"
-	// if cfgStr != "" {
-	// 	config.FromString(cfgStr)
-	// 	Cfg = config
-	// 	if bUseDatabaseCfg {
-	// 		return Cfg, path, nil
-	// 	}
-	// }
 
 	// 尝试从文件读取
-	path = ".config.yaml"
+	path = "config.yaml"
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		path = "config.yaml"
 	}
@@ -269,10 +251,6 @@ func LoadConfig(dbi ConfigDBInterface) (*Config, string, error) {
 		}
 	}
 
-	// err = dbi.InitServerConfig(string(data))
-	// if err != nil {
-	// 	fmt.Println("初始化服务器配置到数据库失败:", err)
-	// }
 	Cfg = config
 	return config, path, nil
 }

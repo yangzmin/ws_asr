@@ -8,7 +8,7 @@ import (
 
 	"angrymiao-ai-server/src/configs"
 	"angrymiao-ai-server/src/core/auth"
-	"angrymiao-ai-server/src/core/auth/casbin"
+	"angrymiao-ai-server/src/core/auth/am_token"
 	"angrymiao-ai-server/src/core/utils"
 
 	"github.com/gin-gonic/gin"
@@ -42,10 +42,7 @@ func (s *DefaultDeviceService) Start(ctx context.Context, engine *gin.Engine, ap
 	apiGroup.OPTIONS("/device/", s.handleDeviceOptions)
 	apiGroup.POST("/device/bind", s.handleDeviceBind)
 	apiGroup.POST("/device/unbind", s.handleDeviceUnbind)
-	// 刷新token
-	apiGroup.GET("/device/refreshToken", s.handleDeviceRefToken)
-
-	// engine.GET("/device_bin/:filename", handleDeviceBinDownload)
+	apiGroup.GET("/device/refresh_token", s.handleDeviceRefToken)
 
 	return nil
 }
@@ -122,7 +119,7 @@ func (s *DefaultDeviceService) handleDeviceRefToken(c *gin.Context) {
 		return
 	}
 
-	if tokenDeviceID != deviceID && tokenUserID != deviceInfo.UserID {
+	if tokenDeviceID != deviceID || tokenUserID != deviceInfo.UserID {
 		s.respondError(c, http.StatusInternalServerError, "token设备ID与请求设备ID不匹配")
 		return
 	}
@@ -170,7 +167,7 @@ func (s *DefaultDeviceService) handleDeviceBind(c *gin.Context) {
 	token := authHeader[7:] // 移除"Bearer "前缀
 
 	// 使用Casbin进行JWT token验证
-	claims, err := casbin.ParseToken(token)
+	claims, err := am_token.ParseToken(token)
 	if err != nil {
 		s.respondError(c, http.StatusUnauthorized, "token验证失败: "+err.Error())
 		return
