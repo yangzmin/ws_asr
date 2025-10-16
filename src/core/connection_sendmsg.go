@@ -23,7 +23,7 @@ func (h *ConnectionHandler) sendHelloMessage() error {
 	hello := make(map[string]interface{})
 	hello["type"] = "hello"
 	hello["version"] = 1
-	hello["transport"] = "websocket"
+    hello["transport"] = "grpcbus"
 	hello["session_id"] = h.sessionID
 	hello["audio_params"] = map[string]interface{}{
 		"format":         h.serverAudioFormat,

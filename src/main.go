@@ -1,4 +1,4 @@
-﻿// @title 怒喵 API 文档
+// @title 怒喵 API 文档
 // @version 1.0
 // @host localhost:8080
 // @BasePath /api
@@ -33,7 +33,7 @@ import (
 	"angrymiao-ai-server/src/core/auth/store"
 	"angrymiao-ai-server/src/core/pool"
 	"angrymiao-ai-server/src/core/transport"
-	"angrymiao-ai-server/src/core/transport/websocket"
+	"angrymiao-ai-server/src/core/transport/grpcbus"
 	"angrymiao-ai-server/src/core/utils"
 
 	// 项目内部包 - 业务模块
@@ -275,13 +275,13 @@ func (app *Application) startTransportServer() error {
 	// 根据配置启用不同的传输层
 	enabledTransports := make([]string, 0)
 
-	// 检查WebSocket传输层配置
+	// 检查传输层配置（切换到 gRPC Bus）
 	if app.config.Transport.WebSocket.Enabled {
-		wsTransport := websocket.NewWebSocketTransport(app.config, app.logger, userConfigService)
-		wsTransport.SetConnectionHandler(handlerFactory)
-		transportManager.RegisterTransport("websocket", wsTransport)
-		enabledTransports = append(enabledTransports, "WebSocket")
-		app.logger.Debug("WebSocket传输层已注册")
+		busTransport := grpcbus.NewGrpcBusTransport(app.config, app.logger, handlerFactory)
+		busTransport.SetConnectionHandler(handlerFactory)
+		transportManager.RegisterTransport("grpcbus", busTransport)
+		enabledTransports = append(enabledTransports, "GrpcBus")
+		app.logger.Debug("GrpcBus 传输层已注册")
 	}
 
 	if len(enabledTransports) == 0 {

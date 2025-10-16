@@ -248,7 +248,17 @@ func NewConnectionHandler(
 }
 
 func (h *ConnectionHandler) SetTaskCallback(callback func(func(*ConnectionHandler)) func()) {
-	h.safeCallbackFunc = callback
+    h.safeCallbackFunc = callback
+}
+
+// SetUserConfigService 注入用户AI配置服务
+func (h *ConnectionHandler) SetUserConfigService(s services.UserAIConfigService) {
+    h.userConfigService = s
+}
+
+// SetTaskManager 注入任务管理器
+func (h *ConnectionHandler) SetTaskManager(tm *task.TaskManager) {
+    h.taskMgr = tm
 }
 
 func (h *ConnectionHandler) SubmitTask(taskType string, params map[string]interface{}) {
@@ -295,15 +305,15 @@ func (h *ConnectionHandler) LogError(msg string) {
 
 // Handle 处理WebSocket连接
 func (h *ConnectionHandler) Handle(conn Connection) {
-	defer conn.Close()
+    defer conn.Close()
 
 	h.conn = conn
 
-	// 在WebSocket连接建立后加载用户AI配置
-	// 此时用户已通过JWT认证，可以安全地加载用户配置
-	if h.request != nil {
-		h.loadUserAIConfigurations(h.request)
-	}
+    // 在WebSocket连接建立后加载用户AI配置
+    // 此时用户已通过JWT认证，可以安全地加载用户配置
+    if h.request != nil {
+        h.loadUserAIConfigurations(h.request)
+    }
 
 	// 启动消息处理协程
 	go h.processClientAudioMessagesCoroutine() // 添加客户端音频消息处理协程
@@ -1164,10 +1174,14 @@ func (h *ConnectionHandler) extractUserIDFromRequest(req *http.Request) (string,
 
 // loadUserAIConfigurations 加载用户AI配置并注册到functionRegister
 func (h *ConnectionHandler) loadUserAIConfigurations(req *http.Request) {
-	if h.userID == "" {
-		h.logger.Debug("用户ID为空，跳过加载用户AI配置")
-		return
-	}
+    if h.userConfigService == nil {
+        h.logger.Error("用户AI配置服务未初始化，跳过加载")
+        return
+    }
+    if h.userID == "" {
+        h.logger.Debug("用户ID为空，跳过加载用户AI配置")
+        return
+    }
 
 	// 首先尝试从请求上下文获取预加载的用户配置
 	if req != nil {

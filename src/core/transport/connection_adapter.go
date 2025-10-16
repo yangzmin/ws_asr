@@ -43,6 +43,9 @@ func NewConnectionContextAdapter(
 
 	// 创建ConnectionHandler
 	handler := core.NewConnectionHandler(config, providerSet, logger, req, connCtx)
+	// 注入依赖：用户配置服务与任务管理器
+	handler.SetUserConfigService(userConfigService)
+	handler.SetTaskManager(taskMgr)
 
 	adapter := &ConnectionContextAdapter{
 		handler:     handler,
